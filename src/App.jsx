@@ -18,6 +18,7 @@ import EmptyState from './components/EmptyState';
 import WelcomeGuide from './components/WelcomeGuide';
 import ConnectionTest from './components/ConnectionTest';
 import DatabaseSetup from './components/DatabaseSetup';
+import SimpleStatus from './components/SimpleStatus';
 
 // Constants for bill calculation
 const WATER_RATE_PER_UNIT = 15;
@@ -181,15 +182,21 @@ const App = () => {
   // UI
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-secondary">
-        <div className="card p-12">
-          <LoadingSpinner size="large" text="กำลังโหลดข้อมูล..." />
+      <>
+        <SimpleStatus />
+        <div className="flex items-center justify-center min-h-screen bg-secondary" style={{paddingTop: '80px'}}>
+          <div className="card p-12">
+            <LoadingSpinner size="large" text="กำลังโหลดข้อมูล..." />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
+    <>
+      <SimpleStatus />
+      <div style={{paddingTop: '80px'}}>
     <div className="flex min-h-screen bg-secondary font-inter">
       <script src="https://cdn.tailwindcss.com"></script>
       
@@ -362,6 +369,8 @@ const App = () => {
         </div>
       </div>
     </div>
+    </div>
+    </>
   );
 };
 
