@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import ProductionApp from './ProductionApp.jsx'
+import EnhancedApp from './EnhancedApp.jsx'
 
-// Production App with full CRUD functionality
+// Enhanced App with meter history and bill calculation
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ProductionApp />
+    <EnhancedApp />
   </StrictMode>,
 )
