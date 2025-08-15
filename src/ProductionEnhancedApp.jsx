@@ -1,7 +1,6 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -681,6 +680,23 @@ const ProductionEnhancedApp = () => {
         water_rate: waterRate,
         electric_rate: electricRate
       });
+    } else if (type === 'payment') {
+      const tenantInfo = getRoomTenantInfo(item);
+      if (tenantInfo.isOccupied) {
+        const bill = calculateBill(item);
+        const paymentStatus = getPaymentStatus(tenantInfo.lease.id);
+        
+        setFormData({
+          tenant_name: tenantInfo.tenant.full_name,
+          tenant_id: tenantInfo.tenant.tenant_id_number,
+          room_number: item.room_number,
+          invoice_amount: bill.total_amount,
+          paid_amount: paymentStatus.paid_amount || 0,
+          payment_method: 'cash',
+          payment_reference: '',
+          payment_notes: ''
+        });
+      }
     }
   };
 
@@ -828,6 +844,22 @@ const ProductionEnhancedApp = () => {
         
         setWaterRate(newWaterRate);
         setElectricRate(newElectricRate);
+      } else if (modalType === 'payment') {
+        const tenantInfo = getRoomTenantInfo(editingItem);
+        if (tenantInfo.isOccupied) {
+          const bill = calculateBill(editingItem);
+          const success = await recordPayment(
+            tenantInfo.lease.id,
+            bill,
+            parseFloat(formData.paid_amount) || 0,
+            formData.payment_method,
+            formData.payment_reference
+          );
+          
+          if (!success) {
+            return; // Don't close modal if payment recording failed
+          }
+        }
       }
 
       await fetchData();
@@ -1756,8 +1788,88 @@ const ProductionEnhancedApp = () => {
                 </div>
               </div>
             )}
+
+            {modalType === 'payment' && (
+              <div>
+                <div style={{backgroundColor: '#f0f9ff', padding: '15px', borderRadius: '6px', marginBottom: '20px'}}>
+                  <h4 style={{margin: '0 0 10px 0', color: '#2563eb'}}>💳 Record Payment</h4>
+                  <p style={{margin: 0, fontSize: '14px', color: '#6b7280'}}>
+                    Record a payment for {formData.tenant_name} ({formData.tenant_id}) - Room {formData.room_number}
+                  </p>
+                </div>
+
+                <div style={{backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '6px', marginBottom: '15px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <span style={{fontSize: '14px', fontWeight: 'bold'}}>Invoice Amount:</span>
+                    <span style={{fontSize: '16px', color: '#2563eb', fontWeight: 'bold'}}>฿{formData.invoice_amount?.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>
+                    💰 Payment Amount (฿):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={formData.invoice_amount}
+                    value={formData.paid_amount || ''}
+                    onChange={(e) => setFormData({...formData, paid_amount: parseFloat(e.target.value) || 0})}
+                    style={inputStyle}
+                    placeholder="Enter payment amount"
+                  />
+                </div>
+
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>
+                    💳 Payment Method:
+                  </label>
+                  <select
+                    value={formData.payment_method || 'cash'}
+                    onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                    style={inputStyle}
+                  >
+                    <option value="cash">💵 Cash</option>
+                    <option value="bank_transfer">🏦 Bank Transfer</option>
+                    <option value="check">📄 Check</option>
+                    <option value="mobile_payment">📱 Mobile Payment</option>
+                    <option value="credit_card">💳 Credit Card</option>
+                  </select>
+                </div>
+
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>
+                    📝 Payment Reference (Optional):
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.payment_reference || ''}
+                    onChange={(e) => setFormData({...formData, payment_reference: e.target.value})}
+                    style={inputStyle}
+                    placeholder="Transaction ID, check number, etc."
+                  />
+                </div>
+
+                {formData.paid_amount > 0 && formData.paid_amount < formData.invoice_amount && (
+                  <div style={{backgroundColor: '#fef3c7', padding: '10px', borderRadius: '6px', marginBottom: '15px'}}>
+                    <p style={{margin: 0, fontSize: '12px', color: '#92400e'}}>
+                      ⚠️ Partial Payment: ฿{(formData.invoice_amount - formData.paid_amount).toLocaleString()} remaining
+                    </p>
+                  </div>
+                )}
+
+                {formData.paid_amount >= formData.invoice_amount && (
+                  <div style={{backgroundColor: '#dcfce7', padding: '10px', borderRadius: '6px', marginBottom: '15px'}}>
+                    <p style={{margin: 0, fontSize: '12px', color: '#166534'}}>
+                      ✅ Full Payment Received
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             
-            {modalType !== 'bill' && (
+            {modalType !== 'bill' && modalType !== 'payment' && (
               <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '20px'}}>
                 <button onClick={closeModal} style={secondaryButtonStyle}>
                   Cancel
@@ -1781,14 +1893,20 @@ const ProductionEnhancedApp = () => {
                 </button>
               </div>
             )}
+
+            {modalType === 'payment' && (
+              <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '20px'}}>
+                <button onClick={closeModal} style={secondaryButtonStyle}>
+                  Cancel
+                </button>
+                <button onClick={handleSave} style={buttonStyle}>
+                  💳 Record Payment
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      {/* Temporary database setup for payment tracking */}
-      <div style={{position: 'fixed', top: '10px', right: '10px', zIndex: 1000}}>
-        <DatabaseSetup />
-      </div>
 
     </div>
   );
