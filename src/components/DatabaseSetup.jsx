@@ -192,6 +192,247 @@ const DatabaseSetup = () => {
     }
   };
 
+  const checkAndCreateTenantsTable = async () => {
+    try {
+      addLog('🔍 Checking tenants table...', 'info');
+      
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        addLog('❌ Tenants table missing, creating it...', 'warning');
+        
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS tenants (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            tenant_id_number VARCHAR(50) UNIQUE NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            phone VARCHAR(50),
+            email VARCHAR(255),
+            address TEXT,
+            id_card_number VARCHAR(50),
+            emergency_contact_name VARCHAR(255),
+            emergency_contact_phone VARCHAR(50),
+            notes TEXT,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_tenants_tenant_id ON tenants(tenant_id_number);
+          CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(is_active);
+          CREATE INDEX IF NOT EXISTS idx_tenants_name ON tenants(full_name);
+          
+          CREATE TRIGGER update_tenants_updated_at 
+          BEFORE UPDATE ON tenants 
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        `;
+        
+        const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+        
+        if (createError) {
+          addLog(`❌ Failed to create tenants table: ${createError.message}`, 'error');
+        } else {
+          addLog('✅ Tenants table created successfully!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ Tenants table already exists!', 'success');
+      } else {
+        addLog(`❌ Tenants table check failed: ${error?.message}`, 'error');
+      }
+    } catch (error) {
+      addLog(`❌ Tenants table error: ${error.message}`, 'error');
+    }
+  };
+
+  const checkAndCreateTenantLeasesTable = async () => {
+    try {
+      addLog('🔍 Checking tenant_leases table...', 'info');
+      
+      const { data, error } = await supabase
+        .from('tenant_leases')
+        .select('*')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        addLog('❌ Tenant leases table missing, creating it...', 'warning');
+        
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS tenant_leases (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+            room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+            lease_start_date DATE NOT NULL,
+            lease_end_date DATE,
+            monthly_rent DECIMAL(10,2) NOT NULL,
+            security_deposit DECIMAL(10,2) DEFAULT 0,
+            lease_status VARCHAR(20) DEFAULT 'active' CHECK (lease_status IN ('active', 'completed', 'terminated', 'pending')),
+            termination_reason TEXT,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            UNIQUE(room_id, lease_status) WHERE lease_status = 'active'
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_tenant_leases_tenant ON tenant_leases(tenant_id);
+          CREATE INDEX IF NOT EXISTS idx_tenant_leases_room ON tenant_leases(room_id);
+          CREATE INDEX IF NOT EXISTS idx_tenant_leases_status ON tenant_leases(lease_status);
+          CREATE INDEX IF NOT EXISTS idx_tenant_leases_dates ON tenant_leases(lease_start_date, lease_end_date);
+          
+          CREATE TRIGGER update_tenant_leases_updated_at 
+          BEFORE UPDATE ON tenant_leases 
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        `;
+        
+        const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+        
+        if (createError) {
+          addLog(`❌ Failed to create tenant_leases table: ${createError.message}`, 'error');
+        } else {
+          addLog('✅ Tenant leases table created successfully!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ Tenant leases table already exists!', 'success');
+      } else {
+        addLog(`❌ Tenant leases table check failed: ${error?.message}`, 'error');
+      }
+    } catch (error) {
+      addLog(`❌ Tenant leases table error: ${error.message}`, 'error');
+    }
+  };
+
+  const checkAndUpdateRoomsTable = async () => {
+    try {
+      addLog('🔍 Checking rooms table for tenant system compatibility...', 'info');
+      
+      // Check if current_tenant_lease_id column exists
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('current_tenant_lease_id')
+        .limit(1);
+      
+      if (error && error.message.includes('column')) {
+        addLog('❌ Adding current_tenant_lease_id column to rooms...', 'warning');
+        
+        const alterTableSQL = `
+          ALTER TABLE rooms 
+          ADD COLUMN IF NOT EXISTS current_tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE SET NULL;
+          
+          CREATE INDEX IF NOT EXISTS idx_rooms_current_lease ON rooms(current_tenant_lease_id);
+        `;
+        
+        const { error: alterError } = await supabase.rpc('exec_sql', { sql: alterTableSQL });
+        
+        if (alterError) {
+          addLog(`❌ Failed to update rooms table: ${alterError.message}`, 'error');
+        } else {
+          addLog('✅ Rooms table updated for tenant system!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ Rooms table already compatible with tenant system!', 'success');
+      } else {
+        addLog(`❌ Rooms table check failed: ${error?.message}`, 'error');
+      }
+    } catch (error) {
+      addLog(`❌ Rooms table update error: ${error.message}`, 'error');
+    }
+  };
+
+  const migrateTenantData = async () => {
+    try {
+      addLog('🔄 Starting tenant data migration...', 'info');
+      
+      // Get all rooms with tenant data
+      const { data: roomsWithTenants, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .not('tenant_name', 'is', null);
+      
+      if (roomsError) {
+        addLog(`❌ Failed to fetch rooms with tenants: ${roomsError.message}`, 'error');
+        return;
+      }
+      
+      if (!roomsWithTenants || roomsWithTenants.length === 0) {
+        addLog('ℹ️ No existing tenant data to migrate', 'info');
+        return;
+      }
+      
+      addLog(`📊 Found ${roomsWithTenants.length} rooms with tenant data to migrate`, 'info');
+      
+      for (const room of roomsWithTenants) {
+        try {
+          // Generate unique tenant ID
+          const tenantIdNumber = `T-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`;
+          
+          // Create tenant record
+          const { data: tenant, error: tenantError } = await supabase
+            .from('tenants')
+            .insert({
+              tenant_id_number: tenantIdNumber,
+              full_name: room.tenant_name,
+              phone: room.tenant_phone || null,
+              address: room.tenant_address || null,
+              id_card_number: room.tenant_id_card || null,
+              is_active: true
+            })
+            .select()
+            .single();
+          
+          if (tenantError) {
+            addLog(`❌ Failed to create tenant ${room.tenant_name}: ${tenantError.message}`, 'error');
+            continue;
+          }
+          
+          // Create lease record
+          const { data: lease, error: leaseError } = await supabase
+            .from('tenant_leases')
+            .insert({
+              tenant_id: tenant.id,
+              room_id: room.id,
+              lease_start_date: room.tenant_start_date || new Date().toISOString().split('T')[0],
+              lease_end_date: room.tenant_end_date || null,
+              monthly_rent: room.rent_price || 0,
+              lease_status: 'active'
+            })
+            .select()
+            .single();
+          
+          if (leaseError) {
+            addLog(`❌ Failed to create lease for ${room.tenant_name}: ${leaseError.message}`, 'error');
+            continue;
+          }
+          
+          // Update room to reference the lease
+          const { error: roomUpdateError } = await supabase
+            .from('rooms')
+            .update({
+              current_tenant_lease_id: lease.id,
+              status: 'occupied'
+            })
+            .eq('id', room.id);
+          
+          if (roomUpdateError) {
+            addLog(`❌ Failed to update room ${room.room_number}: ${roomUpdateError.message}`, 'error');
+            continue;
+          }
+          
+          addLog(`✅ Migrated tenant: ${room.tenant_name} (${tenantIdNumber}) in Room ${room.room_number}`, 'success');
+          
+        } catch (error) {
+          addLog(`❌ Migration error for room ${room.room_number}: ${error.message}`, 'error');
+        }
+      }
+      
+      addLog('🎉 Tenant data migration completed!', 'success');
+      
+    } catch (error) {
+      addLog(`❌ Migration failed: ${error.message}`, 'error');
+    }
+  };
+
   const manualSchemaUpdate = () => {
     addLog('📋 Manual Schema Update Instructions:', 'info');
     addLog('1. Go to your Supabase Dashboard', 'info');
@@ -202,7 +443,14 @@ const DatabaseSetup = () => {
     addLog('4. Run this SQL for tenant date columns:', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_start_date DATE;', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_end_date DATE;', 'info');
-    addLog('5. Run this SQL for revenue history table:', 'info');
+    addLog('5. Run this SQL for tenant management tables:', 'info');
+    addLog('-- Create tenants table', 'info');
+    addLog('CREATE TABLE tenants (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id_number VARCHAR(50) UNIQUE NOT NULL, full_name VARCHAR(255) NOT NULL, phone VARCHAR(50), email VARCHAR(255), address TEXT, id_card_number VARCHAR(50), emergency_contact_name VARCHAR(255), emergency_contact_phone VARCHAR(50), notes TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());', 'info');
+    addLog('-- Create tenant_leases table', 'info');
+    addLog('CREATE TABLE tenant_leases (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, room_id UUID REFERENCES rooms(id) ON DELETE CASCADE, lease_start_date DATE NOT NULL, lease_end_date DATE, monthly_rent DECIMAL(10,2) NOT NULL, security_deposit DECIMAL(10,2) DEFAULT 0, lease_status VARCHAR(20) DEFAULT \'active\', notes TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE(room_id, lease_status) WHERE lease_status = \'active\');', 'info');
+    addLog('-- Update rooms table', 'info');
+    addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS current_tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE SET NULL;', 'info');
+    addLog('6. Run this SQL for revenue history table:', 'info');
     addLog(`CREATE TABLE IF NOT EXISTS revenue_history (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       month_key VARCHAR(7) NOT NULL UNIQUE,
@@ -257,6 +505,11 @@ const DatabaseSetup = () => {
 
       // Check and create revenue history table
       await checkAndCreateRevenueHistoryTable();
+
+      // Check and create tenant management tables
+      await checkAndCreateTenantsTable();
+      await checkAndCreateTenantLeasesTable();
+      await checkAndUpdateRoomsTable();
 
       addLog('✅ Database setup completed!', 'success');
       setSetupStatus('completed');
@@ -430,6 +683,14 @@ const DatabaseSetup = () => {
           {setupStatus === 'creating-sample' ? '🔄 Creating Data...' : '🏗️ Create Sample Data'}
         </button>
         
+        <button
+          onClick={migrateTenantData}
+          style={{...buttonStyle, backgroundColor: '#10b981', border: '1px solid #059669'}}
+          disabled={setupStatus === 'running'}
+        >
+          {setupStatus === 'running' ? '🔄 Migrating...' : '🔄 Migrate Tenant Data'}
+        </button>
+
         <button
           onClick={manualSchemaUpdate}
           style={warningButtonStyle}
