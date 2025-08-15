@@ -196,82 +196,166 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
         error={error} 
         onClose={() => setError('')}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {rooms.map(room => (
-          <div key={room.id} className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 transition-transform transform hover:scale-105 duration-200">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-2xl font-bold text-gray-900">{room.room_number}</h3>
+          <div key={room.id} className="glass p-8 rounded-3xl shadow-lg card-hover group animate-scale-in">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg">
+                  {room.room_number.slice(-2)}
+                </div>
+                <h3 className="text-xl font-bold gradient-text">{room.room_number}</h3>
+              </div>
               <span
-                className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  room.status === 'occupied' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                className={`px-4 py-2 rounded-2xl text-sm font-medium ${
+                  room.status === 'occupied' 
+                    ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200' 
+                    : 'bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 border border-emerald-200'
                 }`}
               >
-                {room.status === 'occupied' ? 'มีผู้เช่า' : 'ห้องว่าง'}
+                {room.status === 'occupied' ? '👤 มีผู้เช่า' : '🏠 ห้องว่าง'}
               </span>
             </div>
             {room.status === 'occupied' ? (
               <>
-                <p className="text-lg font-medium text-gray-700 mb-1">ผู้เช่า: {room.tenant_name}</p>
-                <p className="text-sm text-gray-600 mb-1">ที่อยู่: {room.tenant_address}</p>
-                <p className="text-sm text-gray-600 mb-1">เบอร์โทรศัพท์: {room.tenant_phone}</p>
-                <p className="text-sm text-gray-600 mb-1">ค่าเช่า: {room.rent_price.toLocaleString('th-TH')} บาท</p>
-                <p className="text-sm text-gray-600 mb-1">มิเตอร์น้ำ: {room.water_meter} หน่วย</p>
-                <p className="text-sm text-gray-600 mb-4">มิเตอร์ไฟ: {room.electric_meter} หน่วย</p>
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">👤</span>
+                    <div>
+                      <p className="font-medium text-gray-700">ผู้เช่า</p>
+                      <p className="text-sm text-gray-600">{room.tenant_name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📍</span>
+                    <div>
+                      <p className="font-medium text-gray-700">ที่อยู่</p>
+                      <p className="text-sm text-gray-600">{room.tenant_address}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📞</span>
+                    <div>
+                      <p className="font-medium text-gray-700">เบอร์โทรศัพท์</p>
+                      <p className="text-sm text-gray-600">{room.tenant_phone}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-3 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-200">
+                      <p className="text-lg">💰</p>
+                      <p className="text-xs font-medium text-gray-600">ค่าเช่า</p>
+                      <p className="text-sm font-bold text-green-600">{room.rent_price.toLocaleString('th-TH')}</p>
+                    </div>
+                    <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border border-blue-200">
+                      <p className="text-lg">💧</p>
+                      <p className="text-xs font-medium text-gray-600">น้ำ</p>
+                      <p className="text-sm font-bold text-blue-600">{room.water_meter}</p>
+                    </div>
+                    <div className="text-center p-3 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border border-yellow-200">
+                      <p className="text-lg">⚡</p>
+                      <p className="text-xs font-medium text-gray-600">ไฟ</p>
+                      <p className="text-sm font-bold text-orange-600">{room.electric_meter}</p>
+                    </div>
+                  </div>
+                </div>
                 {room.is_overdue && (
-                  <p className="text-red-500 font-semibold mb-4">ค้างชำระค่าเช่า!</p>
-                )}
-                {room.current_bill && (
-                  <div className="bg-yellow-50 p-4 rounded-xl mb-4">
-                    <h4 className="font-bold text-lg text-yellow-800 mb-1">บิลเดือน {room.current_bill.month}</h4>
-                    <p className="text-sm text-yellow-700">ชื่อผู้เช่า: {room.current_bill.tenant_name}</p>
-                    <p className="text-sm text-yellow-700">รวม: {room.current_bill.total_amount.toLocaleString('th-TH')} บาท</p>
-                    <p className="text-sm text-yellow-700">กำหนดชำระ: {format(parseISO(room.current_bill.due_date), 'd MMMM yyyy')}</p>
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 p-4 rounded-2xl mb-4 animate-pulse">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⚠️</span>
+                      <p className="text-red-600 font-semibold">ค้างชำระค่าเช่า</p>
+                    </div>
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
+                {room.current_bill && (
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 p-5 rounded-2xl mb-6 group hover:shadow-lg transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xl">🧾</span>
+                      <h4 className="font-bold text-lg text-amber-800">บิลเดือน {room.current_bill.month}</h4>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-amber-700">ชื่อผู้เช่า:</span>
+                        <span className="text-sm font-medium text-amber-800">{room.current_bill.tenant_name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-amber-700">จำนวนเงิน:</span>
+                        <span className="text-lg font-bold text-amber-800">{room.current_bill.total_amount.toLocaleString('th-TH')} บาท</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-amber-700">กำหนดชำระ:</span>
+                        <span className="text-sm font-medium text-amber-800">{format(parseISO(room.current_bill.due_date), 'd MMMM yyyy')}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => openModal('edit', room)}
-                    className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors duration-200"
+                    className="btn-modern py-3 px-4 text-sm font-medium bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300"
                   >
-                    แก้ไข
+                    <span className="flex items-center justify-center gap-2">
+                      <span>✏️</span>
+                      แก้ไข
+                    </span>
                   </button>
                   <button
                     onClick={() => handleCalculateBill(room)}
-                    className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors duration-200"
+                    className="btn-modern py-3 px-4 text-sm font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300"
                   >
-                    สร้างบิล
+                    <span className="flex items-center justify-center gap-2">
+                      <span>📋</span>
+                      สร้างบิล
+                    </span>
                   </button>
                   {room.current_bill && (
                     <>
                       <button
                         onClick={() => handlePayment(room)}
-                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors duration-200"
+                        className="btn-modern py-3 px-4 text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300"
                       >
-                        ชำระแล้ว
+                        <span className="flex items-center justify-center gap-2">
+                          <span>✅</span>
+                          ชำระแล้ว
+                        </span>
                       </button>
                       <button
                         onClick={() => showBillReceipt(room, room.current_bill)}
-                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-indigo-500 text-white hover:bg-indigo-600 transition-colors duration-200"
+                        className="btn-modern py-3 px-4 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300"
                       >
-                        ใบเสร็จ
+                        <span className="flex items-center justify-center gap-2">
+                          <span>🧾</span>
+                          ใบเสร็จ
+                        </span>
                       </button>
                     </>
                   )}
                   <button
                     onClick={() => handleCheckout(room)}
-                    className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+                    className="btn-modern py-3 px-4 text-sm font-medium bg-gradient-to-r from-red-500 to-pink-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300 col-span-2"
                   >
-                    เช็คเอาท์
+                    <span className="flex items-center justify-center gap-2">
+                      <span>🚪</span>
+                      เช็คเอาท์
+                    </span>
                   </button>
                 </div>
               </>
             ) : (
-              <div className="pt-8">
+              <div className="pt-8 text-center">
+                <div className="mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl">
+                    🏠
+                  </div>
+                  <p className="text-gray-500 font-medium">ห้องว่าง พร้อมให้เช่า</p>
+                </div>
                 <button
                   onClick={() => openModal('add', { ...roomData, room_number: room.room_number, building_id: room.building_id })}
-                  className="w-full py-2 px-4 rounded-lg font-medium bg-teal-500 text-white hover:bg-teal-600 transition-colors duration-200"
+                  className="btn-modern w-full py-4 px-6 font-medium bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300 animate-glow"
                 >
-                  เพิ่มผู้เช่า
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-lg">➕</span>
+                    เพิ่มผู้เช่า
+                  </span>
                 </button>
               </div>
             )}

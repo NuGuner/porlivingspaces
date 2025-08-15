@@ -20,7 +20,7 @@ const ErrorNotification = ({ error, onClose, autoClose = true, duration = 5000 }
   if (!error) return null;
 
   return (
-    <div className="fixed top-4 right-4 max-w-md bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow-lg z-50 animate-slide-in">
+    <div className="fixed top-6 right-6 max-w-md glass border-l-4 border-red-400 p-6 rounded-2xl shadow-xl z-50 animate-slide-in backdrop-blur-xl">
       <div className="flex">
         <div className="flex-shrink-0">
           <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -34,7 +34,7 @@ const ErrorNotification = ({ error, onClose, autoClose = true, duration = 5000 }
         <div className="ml-auto pl-3">
           <button
             onClick={onClose}
-            className="inline-flex bg-red-50 rounded-md p-1.5 text-red-400 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+            className="inline-flex glass rounded-xl p-2 text-red-400 hover:bg-red-100/50 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 transition-all duration-200"
           >
             <span className="sr-only">ปิด</span>
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
