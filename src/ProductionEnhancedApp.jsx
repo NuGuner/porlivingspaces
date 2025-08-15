@@ -432,18 +432,68 @@ const ProductionEnhancedApp = () => {
   const handleDelete = async (type, item) => {
     try {
       if (type === 'building') {
+        // Check if building has rooms
+        const { data: buildingRooms, error: roomsError } = await supabase
+          .from('rooms')
+          .select('id, room_number, tenant_name')
+          .eq('building_id', item.id);
+        
+        if (roomsError) throw roomsError;
+        
+        if (buildingRooms && buildingRooms.length > 0) {
+          // Building has rooms - ask for confirmation and delete rooms first
+          const roomsList = buildingRooms.map(room => 
+            `• Room ${room.room_number}${room.tenant_name ? ` (${room.tenant_name})` : ' (vacant)'}`
+          ).join('\n');
+          
+          const confirmMessage = `This building contains ${buildingRooms.length} room(s):\n\n${roomsList}\n\nDeleting the building will also delete all its rooms and tenant data. Are you sure?`;
+          
+          if (!window.confirm(confirmMessage)) {
+            return; // User cancelled
+          }
+          
+          // Delete all rooms in the building first
+          const { error: deleteRoomsError } = await supabase
+            .from('rooms')
+            .delete()
+            .eq('building_id', item.id);
+          
+          if (deleteRoomsError) throw deleteRoomsError;
+        }
+        
+        // Now delete the building
         const { error } = await supabase
           .from('buildings')
           .delete()
           .eq('id', item.id);
         if (error) throw error;
+        
+        // Update selected building if we deleted the currently selected one
+        if (selectedBuilding === item.id) {
+          setSelectedBuilding(null);
+        }
       } else if (type === 'room') {
+        // Check if room has a tenant
+        if (item.tenant_name) {
+          const confirmMessage = `Room ${item.room_number} is currently occupied by ${item.tenant_name}.\n\nDeleting this room will also remove all tenant data and billing history. Are you sure?`;
+          
+          if (!window.confirm(confirmMessage)) {
+            return; // User cancelled
+          }
+        }
+        
         const { error } = await supabase
           .from('rooms')
           .delete()
           .eq('id', item.id);
         if (error) throw error;
       } else if (type === 'tenant') {
+        const confirmMessage = `Remove tenant ${item.tenant_name} from room ${item.room_number}?\n\nThis will:\n• Clear all tenant information\n• Reset meter readings\n• Set room status to vacant\n• Clear billing data\n\nAre you sure?`;
+        
+        if (!window.confirm(confirmMessage)) {
+          return; // User cancelled
+        }
+        
         const { error } = await supabase
           .from('rooms')
           .update({
