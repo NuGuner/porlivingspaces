@@ -208,8 +208,8 @@ const ProductionEnhancedApp = () => {
         .from('tenant_leases')
         .select(`
           *,
-          tenant:tenants(*),
-          room:rooms(*)
+          tenant:tenant_id(*),
+          room:room_id(*)
         `)
         .eq('lease_status', 'active');
         
