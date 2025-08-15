@@ -162,51 +162,54 @@ const DataDebugger = () => {
   };
 
   return (
-    <div className="glass p-6 rounded-3xl mb-6">
-      <h2 className="text-xl font-bold gradient-text mb-4">🔍 Data Debugger</h2>
+    <div className="card p-6 mb-8 border-2 border-info/20 bg-info/5">
+      <h2 className="text-xl font-bold text-info mb-4">🔍 Database Connection Status</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-200">
-          <h3 className="font-semibold text-blue-800 mb-2">Connection Status</h3>
-          <p className={`font-bold ${
-            debugInfo.connectionStatus === 'connected' ? 'text-green-600' : 
-            debugInfo.connectionStatus === 'failed' ? 'text-red-600' : 'text-yellow-600'
+        <div className="card p-4">
+          <h3 className="font-semibold text-gray-700 mb-2">Connection Status</h3>
+          <p className={`font-bold text-lg ${
+            debugInfo.connectionStatus === 'connected' ? 'text-success' : 
+            debugInfo.connectionStatus === 'failed' ? 'text-error' : 'text-warning'
           }`}>
-            {debugInfo.connectionStatus}
+            {debugInfo.connectionStatus === 'connected' ? '✅ Connected' :
+             debugInfo.connectionStatus === 'failed' ? '❌ Failed' : '⏳ Checking...'}
           </p>
         </div>
         
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border border-green-200">
-          <h3 className="font-semibold text-green-800 mb-2">Buildings Found</h3>
-          <p className="text-2xl font-bold text-green-600">{debugInfo.buildings.length}</p>
+        <div className="card p-4">
+          <h3 className="font-semibold text-gray-700 mb-2">Buildings Found</h3>
+          <p className="text-2xl font-bold text-primary">{debugInfo.buildings.length}</p>
         </div>
         
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-200">
-          <h3 className="font-semibold text-purple-800 mb-2">Rooms Found</h3>
-          <p className="text-2xl font-bold text-purple-600">{debugInfo.rooms.length}</p>
+        <div className="card p-4">
+          <h3 className="font-semibold text-gray-700 mb-2">Rooms Found</h3>
+          <p className="text-2xl font-bold text-primary">{debugInfo.rooms.length}</p>
         </div>
       </div>
 
       {debugInfo.errors.length > 0 && (
-        <div className="bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 p-4 rounded-2xl mb-4">
-          <h3 className="font-semibold text-red-800 mb-2">Errors:</h3>
+        <div className="card p-4 mb-4 border-2 border-error/20 bg-error/5">
+          <h3 className="font-semibold text-error mb-2">⚠️ Connection Errors:</h3>
           {debugInfo.errors.map((error, index) => (
-            <p key={index} className="text-red-600 text-sm">{error}</p>
+            <p key={index} className="text-error text-sm bg-white p-2 rounded mb-2 font-mono">{error}</p>
           ))}
         </div>
       )}
 
       {debugInfo.buildings.length === 0 && debugInfo.connectionStatus === 'connected' && (
-        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 p-4 rounded-2xl mb-4">
-          <h3 className="font-semibold text-yellow-800 mb-2">No Data Found</h3>
-          <p className="text-yellow-700 text-sm mb-3">
-            Your Supabase tables appear to be empty. Would you like to create some sample data?
+        <div className="card p-6 mb-4 border-2 border-warning/20 bg-warning/5">
+          <h3 className="font-semibold text-warning mb-3">📊 Database is Empty</h3>
+          <p className="text-gray-700 mb-4">
+            Your Supabase database tables are empty. This is why no information is displaying on the page.
+            <br />
+            <strong>Click the button below to create sample data and see the application in action!</strong>
           </p>
           <button
             onClick={createSampleData}
-            className="btn-modern py-2 px-4 font-medium bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:shadow-lg hover:scale-105 transition-all duration-300"
+            className="btn-primary py-3 px-6 text-sm font-medium"
           >
-            Create Sample Data
+            🎯 Create Sample Data Now
           </button>
         </div>
       )}

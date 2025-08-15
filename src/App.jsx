@@ -15,6 +15,7 @@ import DataManagement from './components/DataManagement';
 import LoadingSpinner from './components/LoadingSpinner';
 import DataDebugger from './components/DataDebugger';
 import EmptyState from './components/EmptyState';
+import WelcomeGuide from './components/WelcomeGuide';
 
 // Constants for bill calculation
 const WATER_RATE_PER_UNIT = 15;
@@ -84,6 +85,94 @@ const App = () => {
     } catch (e) {
       console.error("Error refreshing data:", e);
       setError("เกิดข้อผิดพลาดในการรีเฟรชข้อมูล");
+    }
+  };
+
+  // Function to create sample data
+  const createSampleData = async () => {
+    try {
+      setLoading(true);
+      // Create sample building
+      const { data: building, error: buildingError } = await supabase
+        .from('buildings')
+        .insert([{ name: 'อาคาร A' }])
+        .select();
+
+      if (buildingError) throw buildingError;
+
+      // Create sample rooms
+      const buildingId = building[0].id;
+      const { error: roomsError } = await supabase
+        .from('rooms')
+        .insert([
+          {
+            room_number: 'A101',
+            building_id: buildingId,
+            tenant_name: 'สมชาย ใจดี',
+            tenant_address: '123 ถนนสุขุมวิท กรุงเทพฯ',
+            tenant_phone: '081-234-5678',
+            tenant_id_card: '1234567890123',
+            rent_price: 8000,
+            water_meter: 150,
+            electric_meter: 220,
+            status: 'occupied',
+            is_overdue: false,
+            current_bill: {
+              month: '2024-01',
+              due_date: '2024-01-05',
+              tenant_name: 'สมชาย ใจดี',
+              rent_amount: 8000,
+              water_units: 25,
+              water_cost: 375,
+              electric_units: 45,
+              electric_cost: 360,
+              total_amount: 8735,
+              is_paid: false
+            },
+            history: []
+          },
+          {
+            room_number: 'A102',
+            building_id: buildingId,
+            tenant_name: null,
+            tenant_address: null,
+            tenant_phone: null,
+            tenant_id_card: null,
+            rent_price: 7500,
+            water_meter: 0,
+            electric_meter: 0,
+            status: 'vacant',
+            is_overdue: false,
+            current_bill: null,
+            history: []
+          },
+          {
+            room_number: 'A103',
+            building_id: buildingId,
+            tenant_name: 'สมหญิง รักดี',
+            tenant_address: '456 ถนนราชดำริ กรุงเทพฯ',
+            tenant_phone: '082-345-6789',
+            tenant_id_card: '9876543210987',
+            rent_price: 7500,
+            water_meter: 180,
+            electric_meter: 195,
+            status: 'occupied',
+            is_overdue: true,
+            current_bill: null,
+            history: []
+          }
+        ]);
+
+      if (roomsError) throw roomsError;
+
+      // Refresh data after creating sample data
+      await refreshData();
+      setLoading(false);
+      setError(''); // Clear any previous errors
+      
+    } catch (error) {
+      setError(`เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง: ${error.message}`);
+      setLoading(false);
     }
   };
 
@@ -191,9 +280,9 @@ const App = () => {
               <Dashboard rooms={rooms} />
 
               {buildings.length === 0 ? (
-                <EmptyState 
-                  type="buildings"
-                  onAction={() => setActiveTab('buildings')}
+                <WelcomeGuide 
+                  onCreateSampleData={createSampleData}
+                  onGoToBuildings={() => setActiveTab('buildings')}
                 />
               ) : (
                 <>
