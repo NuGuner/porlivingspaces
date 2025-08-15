@@ -519,20 +519,19 @@ const EnhancedApp = () => {
       )}
 
       {/* Debug Status - Temporary */}
-      {!loading && (
-        <div style={{...cardStyle, backgroundColor: '#fee2e2', border: '2px solid #dc2626', marginBottom: '20px'}}>
-          <h3 style={{margin: '0 0 10px 0', color: '#dc2626'}}>🔍 Debug Status</h3>
-          <div style={{fontSize: '14px', fontFamily: 'monospace'}}>
-            <p>Loading: {loading.toString()}</p>
-            <p>Buildings count: {buildings.length}</p>
-            <p>Rooms count: {rooms.length}</p>
-            <p>Selected building: {selectedBuilding || 'none'}</p>
-            <p>Error: {error || 'none'}</p>
-            <p>Water rate: {waterRate}</p>
-            <p>Electric rate: {electricRate}</p>
-          </div>
+      <div style={{...cardStyle, backgroundColor: '#fee2e2', border: '2px solid #dc2626', marginBottom: '20px'}}>
+        <h3 style={{margin: '0 0 10px 0', color: '#dc2626'}}>🔍 Debug Status - EnhancedApp</h3>
+        <div style={{fontSize: '14px', fontFamily: 'monospace'}}>
+          <p>Loading: {loading.toString()}</p>
+          <p>Buildings count: {buildings.length}</p>
+          <p>Rooms count: {rooms.length}</p>
+          <p>Selected building: {selectedBuilding || 'none'}</p>
+          <p>Current rooms: {currentRooms.length}</p>
+          <p>Error: {error || 'none'}</p>
+          <p>Water rate: {waterRate}</p>
+          <p>Electric rate: {electricRate}</p>
         </div>
-      )}
+      </div>
 
       {/* Error State */}
       {error && (
