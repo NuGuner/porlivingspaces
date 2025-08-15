@@ -1,6 +1,7 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -234,7 +235,12 @@ const ProductionEnhancedApp = () => {
       total_amount: totalAmount,
       month: new Date().toISOString().slice(0, 7),
       due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-      has_meter_history: room.previous_water_meter !== undefined && room.previous_electric_meter !== undefined
+      has_meter_history: room.previous_water_meter !== undefined && room.previous_electric_meter !== undefined,
+      tenant_start_date: room.tenant_start_date,
+      tenant_end_date: room.tenant_end_date,
+      lease_period: room.tenant_start_date ? 
+        `${new Date(room.tenant_start_date).toLocaleDateString()} - ${room.tenant_end_date ? new Date(room.tenant_end_date).toLocaleDateString() : 'Ongoing'}` : 
+        'Not specified'
     };
   };
 
@@ -262,6 +268,8 @@ const ProductionEnhancedApp = () => {
         tenant_address: item.tenant_address || '',
         tenant_phone: item.tenant_phone || '',
         tenant_id_card: item.tenant_id_card || '',
+        tenant_start_date: item.tenant_start_date || '',
+        tenant_end_date: item.tenant_end_date || '',
         rent_price: item.rent_price || 0,
         previous_water_meter: item.previous_water_meter || 0,
         water_meter: item.water_meter || 0,
@@ -272,6 +280,8 @@ const ProductionEnhancedApp = () => {
         tenant_address: '',
         tenant_phone: '',
         tenant_id_card: '',
+        tenant_start_date: '',
+        tenant_end_date: '',
         rent_price: editingItem?.rent_price || 0,
         previous_water_meter: 0,
         water_meter: 0,
@@ -359,10 +369,12 @@ const ProductionEnhancedApp = () => {
         }
         
         const updateData = {
-          tenant_name: formData.tenant_name,
-          tenant_address: formData.tenant_address,
-          tenant_phone: formData.tenant_phone,
-          tenant_id_card: formData.tenant_id_card,
+                        tenant_name: formData.tenant_name,
+              tenant_address: formData.tenant_address,
+              tenant_phone: formData.tenant_phone,
+              tenant_id_card: formData.tenant_id_card,
+              tenant_start_date: formData.tenant_start_date,
+              tenant_end_date: formData.tenant_end_date,
           rent_price: formData.rent_price,
           status: 'occupied'
         };
@@ -515,22 +527,24 @@ const ProductionEnhancedApp = () => {
           return; // User cancelled
         }
         
-        const { error } = await supabase
-          .from('rooms')
-          .update({
-            tenant_name: null,
-            tenant_address: null,
-            tenant_phone: null,
-            tenant_id_card: null,
-            status: 'vacant',
-            previous_water_meter: 0,
-            water_meter: 0,
-            previous_electric_meter: 0,
-            electric_meter: 0,
-            is_overdue: false,
-            current_bill: null
-          })
-          .eq('id', item.id);
+                    const { error } = await supabase
+              .from('rooms')
+              .update({
+                tenant_name: null,
+                tenant_address: null,
+                tenant_phone: null,
+                tenant_id_card: null,
+                tenant_start_date: null,
+                tenant_end_date: null,
+                status: 'vacant',
+                previous_water_meter: 0,
+                water_meter: 0,
+                previous_electric_meter: 0,
+                electric_meter: 0,
+                is_overdue: false,
+                current_bill: null
+              })
+              .eq('id', item.id);
         if (error) throw error;
       }
 
@@ -864,6 +878,11 @@ const ProductionEnhancedApp = () => {
                               <p style={{margin: '2px 0', fontSize: '14px'}}>
                                 <strong>Phone:</strong> {room.tenant_phone}
                               </p>
+                              {room.tenant_start_date && (
+                                <p style={{margin: '2px 0', fontSize: '14px'}}>
+                                  <strong>📅 Lease:</strong> {new Date(room.tenant_start_date).toLocaleDateString()} - {room.tenant_end_date ? new Date(room.tenant_end_date).toLocaleDateString() : 'Ongoing'}
+                                </p>
+                              )}
                             </>
                           )}
                         </div>
@@ -1045,13 +1064,33 @@ const ProductionEnhancedApp = () => {
                 <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>
                   ID Card Number:
                 </label>
-                <input
-                  type="text"
-                  value={formData.tenant_id_card || ''}
-                  onChange={(e) => setFormData({...formData, tenant_id_card: e.target.value})}
-                  style={inputStyle}
-                  placeholder="Enter ID card number"
-                />
+                                  <input
+                    type="text"
+                    value={formData.tenant_id_card || ''}
+                    onChange={(e) => setFormData({...formData, tenant_id_card: e.target.value})}
+                    style={inputStyle}
+                    placeholder="Enter ID card number"
+                  />
+
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', marginTop: '15px'}}>
+                    📅 Lease Start Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.tenant_start_date || ''}
+                    onChange={(e) => setFormData({...formData, tenant_start_date: e.target.value})}
+                    style={inputStyle}
+                  />
+
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', marginTop: '15px'}}>
+                    📅 Lease End Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.tenant_end_date || ''}
+                    onChange={(e) => setFormData({...formData, tenant_end_date: e.target.value})}
+                    style={inputStyle}
+                  />
 
                 <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>
                   Monthly Rent (฿):
@@ -1232,6 +1271,9 @@ const ProductionEnhancedApp = () => {
                     <h4 style={{margin: '0 0 8px 0', fontSize: '16px'}}>📍 Property Details</h4>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Room: {editingItem?.room_number}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Tenant: {editingItem?.tenant_name}</p>
+                    {formData.lease_period && (
+                      <p style={{margin: '2px 0', fontSize: '14px'}}>📅 Lease Period: {formData.lease_period}</p>
+                    )}
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Month: {formData.month}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Due Date: {formData.due_date}</p>
                   </div>
@@ -1300,6 +1342,11 @@ const ProductionEnhancedApp = () => {
           </div>
         </div>
       )}
+
+      {/* Temporary database setup for tenant date columns */}
+      <div style={{position: 'fixed', top: '10px', right: '10px', zIndex: 1000}}>
+        <DatabaseSetup />
+      </div>
 
     </div>
   );

@@ -72,6 +72,61 @@ const DatabaseSetup = () => {
     }
   };
 
+  const checkAndAddTenantDateColumns = async () => {
+    try {
+      addLog('🔍 Checking tenant date columns...', 'info');
+      
+      // Try to select the new columns to see if they exist
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('tenant_start_date, tenant_end_date')
+        .limit(1);
+      
+      if (error && error.message.includes('column')) {
+        addLog('❌ Tenant date columns missing, adding them...', 'warning');
+        
+        // Add the missing columns using SQL
+        const { error: alterError } = await supabase.rpc('exec_sql', {
+          sql: `
+            ALTER TABLE rooms 
+            ADD COLUMN IF NOT EXISTS tenant_start_date DATE,
+            ADD COLUMN IF NOT EXISTS tenant_end_date DATE;
+          `
+        });
+        
+        if (alterError) {
+          // If RPC doesn't work, try direct SQL execution
+          addLog('⚠️ RPC method failed, trying alternative approach...', 'warning');
+          
+          // Create a temporary function to add columns
+          const alterQueries = [
+            "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_start_date DATE;",
+            "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_end_date DATE;"
+          ];
+          
+          for (const query of alterQueries) {
+            const { error: sqlError } = await supabase.rpc('exec_sql', { sql: query });
+            if (sqlError) {
+              addLog(`❌ Failed to execute: ${query}`, 'error');
+              addLog(`Error: ${sqlError.message}`, 'error');
+            } else {
+              addLog(`✅ Executed: ${query}`, 'success');
+            }
+          }
+        } else {
+          addLog('✅ Tenant date columns added successfully!', 'success');
+        }
+      } else if (data) {
+        addLog('✅ Tenant date columns already exist!', 'success');
+      } else {
+        addLog(`❌ Schema check failed: ${error?.message}`, 'error');
+      }
+      
+    } catch (error) {
+      addLog(`❌ Tenant date columns error: ${error.message}`, 'error');
+    }
+  };
+
   const checkAndCreateRevenueHistoryTable = async () => {
     try {
       addLog('🔍 Checking revenue_history table...', 'info');
@@ -144,7 +199,10 @@ const DatabaseSetup = () => {
     addLog('3. Run this SQL for meter columns:', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS previous_water_meter INTEGER DEFAULT 0;', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS previous_electric_meter INTEGER DEFAULT 0;', 'info');
-    addLog('4. Run this SQL for revenue history table:', 'info');
+    addLog('4. Run this SQL for tenant date columns:', 'info');
+    addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_start_date DATE;', 'info');
+    addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS tenant_end_date DATE;', 'info');
+    addLog('5. Run this SQL for revenue history table:', 'info');
     addLog(`CREATE TABLE IF NOT EXISTS revenue_history (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       month_key VARCHAR(7) NOT NULL UNIQUE,
@@ -192,6 +250,9 @@ const DatabaseSetup = () => {
         
         // Now check and add meter columns
         await checkAndAddMeterColumns();
+        
+        // Check and add tenant date columns
+        await checkAndAddTenantDateColumns();
       }
 
       // Check and create revenue history table
