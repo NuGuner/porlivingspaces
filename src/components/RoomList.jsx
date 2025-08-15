@@ -13,7 +13,7 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [currentRoom, setCurrentRoom] = useState(null);
-  const [error, setError] = useState('');
+  const [_error, setError] = useState('');
 
   // State for new room or edited room data
   const [roomData, setRoomData] = useState({
