@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import EnhancedApp from './EnhancedApp.jsx'
+import DiagnosticApp from './DiagnosticApp.jsx'
 
-// Enhanced App with meter history and bill calculation
+// Diagnostic App to check why no data is showing
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <EnhancedApp />
+    <DiagnosticApp />
   </StrictMode>,
 )
