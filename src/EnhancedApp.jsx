@@ -81,6 +81,7 @@ const EnhancedApp = () => {
 
   // Modal handling
   const openModal = (type, item = null) => {
+    console.log('📝 Opening modal:', { type, item });
     setModalType(type);
     setEditingItem(item);
     setShowModal(true);
@@ -98,7 +99,7 @@ const EnhancedApp = () => {
         building_id: selectedBuilding
       });
     } else if (type === 'tenant') {
-      setFormData(item ? {
+      const tenantFormData = item ? {
         tenant_name: item.tenant_name || '',
         tenant_address: item.tenant_address || '',
         tenant_phone: item.tenant_phone || '',
@@ -118,7 +119,9 @@ const EnhancedApp = () => {
         water_meter: 0,
         previous_electric_meter: 0,
         electric_meter: 0
-      });
+      };
+      console.log('🏠 Setting tenant form data:', tenantFormData);
+      setFormData(tenantFormData);
     } else if (type === 'bill') {
       const bill = calculateBill(item);
       setFormData(bill || {});
@@ -141,6 +144,7 @@ const EnhancedApp = () => {
 
   // CRUD Operations
   const handleSave = async () => {
+    console.log('💾 Saving...', { modalType, editingItem: editingItem?.id, formData });
     try {
       if (modalType === 'building') {
         if (editingItem) {
@@ -189,6 +193,11 @@ const EnhancedApp = () => {
           if (error) throw error;
         }
       } else if (modalType === 'tenant') {
+        // Always update the room with tenant info (both add and edit tenant use the same room update)
+        if (!editingItem) {
+          throw new Error('No room selected for tenant operation');
+        }
+        
         const { error } = await supabase
           .from('rooms')
           .update({
@@ -219,10 +228,12 @@ const EnhancedApp = () => {
         if (error) throw error;
       }
 
+      console.log('✅ Save successful, refreshing data...');
       await fetchData();
       closeModal();
       setError('');
     } catch (error) {
+      console.error('❌ Save failed:', error);
       setError(`Save failed: ${error.message}`);
     }
   };
