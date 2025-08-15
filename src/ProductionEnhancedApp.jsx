@@ -1,7 +1,6 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -1342,11 +1341,6 @@ const ProductionEnhancedApp = () => {
           </div>
         </div>
       )}
-
-      {/* Temporary database setup for tenant date columns */}
-      <div style={{position: 'fixed', top: '10px', right: '10px', zIndex: 1000}}>
-        <DatabaseSetup />
-      </div>
 
     </div>
   );
