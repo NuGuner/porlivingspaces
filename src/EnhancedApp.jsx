@@ -1,6 +1,7 @@
 // Enhanced App with meter reading history and bill calculation
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import DatabaseSetup from './components/DatabaseSetup';
 
 const EnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -61,8 +62,12 @@ const EnhancedApp = () => {
   const calculateBill = (room) => {
     if (!room.tenant_name || room.status !== 'occupied') return null;
 
-    const waterUnits = Math.max(0, (room.water_meter || 0) - (room.previous_water_meter || 0));
-    const electricUnits = Math.max(0, (room.electric_meter || 0) - (room.previous_electric_meter || 0));
+    // Handle cases where meter history columns don't exist
+    const previousWater = room.previous_water_meter !== undefined ? room.previous_water_meter || 0 : 0;
+    const previousElectric = room.previous_electric_meter !== undefined ? room.previous_electric_meter || 0 : 0;
+    
+    const waterUnits = Math.max(0, (room.water_meter || 0) - previousWater);
+    const electricUnits = Math.max(0, (room.electric_meter || 0) - previousElectric);
     const waterCost = waterUnits * WATER_RATE_PER_UNIT;
     const electricCost = electricUnits * ELECTRIC_RATE_PER_UNIT;
     const totalAmount = (room.rent_price || 0) + waterCost + electricCost;
@@ -75,7 +80,8 @@ const EnhancedApp = () => {
       electric_cost: electricCost,
       total_amount: totalAmount,
       month: new Date().toISOString().slice(0, 7), // YYYY-MM format
-      due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) // 5 days from now
+      due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), // 5 days from now
+      has_meter_history: room.previous_water_meter !== undefined && room.previous_electric_meter !== undefined
     };
   };
 
@@ -198,34 +204,92 @@ const EnhancedApp = () => {
           throw new Error('No room selected for tenant operation');
         }
         
+        // Prepare update data, excluding meter fields if they don't exist in schema
+        const updateData = {
+          tenant_name: formData.tenant_name,
+          tenant_address: formData.tenant_address,
+          tenant_phone: formData.tenant_phone,
+          tenant_id_card: formData.tenant_id_card,
+          rent_price: formData.rent_price,
+          status: 'occupied'
+        };
+
+        // Try to include meter fields if they exist
+        try {
+          // Test if meter history columns exist by doing a select
+          const { error: testError } = await supabase
+            .from('rooms')
+            .select('previous_water_meter, previous_electric_meter')
+            .limit(1);
+          
+          if (!testError) {
+            // Columns exist, include them
+            updateData.previous_water_meter = formData.previous_water_meter;
+            updateData.water_meter = formData.water_meter;
+            updateData.previous_electric_meter = formData.previous_electric_meter;
+            updateData.electric_meter = formData.electric_meter;
+            console.log('✅ Including meter history fields in update');
+          } else {
+            console.log('⚠️ Meter history columns not found, updating without them');
+            // Include only basic meter fields that should exist
+            updateData.water_meter = formData.water_meter;
+            updateData.electric_meter = formData.electric_meter;
+          }
+        } catch (schemaError) {
+          console.log('⚠️ Schema check failed, using basic fields only');
+          updateData.water_meter = formData.water_meter;
+          updateData.electric_meter = formData.electric_meter;
+        }
+
         const { error } = await supabase
           .from('rooms')
-          .update({
-            tenant_name: formData.tenant_name,
-            tenant_address: formData.tenant_address,
-            tenant_phone: formData.tenant_phone,
-            tenant_id_card: formData.tenant_id_card,
-            rent_price: formData.rent_price,
-            previous_water_meter: formData.previous_water_meter,
-            water_meter: formData.water_meter,
-            previous_electric_meter: formData.previous_electric_meter,
-            electric_meter: formData.electric_meter,
-            status: 'occupied'
-          })
+          .update(updateData)
           .eq('id', editingItem.id);
         if (error) throw error;
       } else if (modalType === 'meter-update') {
-        // Save current readings as previous, update with new readings
-        const { error } = await supabase
-          .from('rooms')
-          .update({
-            previous_water_meter: editingItem.water_meter,
-            water_meter: formData.water_meter,
-            previous_electric_meter: editingItem.electric_meter,
-            electric_meter: formData.electric_meter
-          })
-          .eq('id', editingItem.id);
-        if (error) throw error;
+        // Check if meter history columns exist
+        try {
+          const { error: testError } = await supabase
+            .from('rooms')
+            .select('previous_water_meter, previous_electric_meter')
+            .limit(1);
+          
+          if (!testError) {
+            // Columns exist, update with history
+            const { error } = await supabase
+              .from('rooms')
+              .update({
+                previous_water_meter: editingItem.water_meter,
+                water_meter: formData.water_meter,
+                previous_electric_meter: editingItem.electric_meter,
+                electric_meter: formData.electric_meter
+              })
+              .eq('id', editingItem.id);
+            if (error) throw error;
+          } else {
+            // Columns don't exist, update only current meters
+            const { error } = await supabase
+              .from('rooms')
+              .update({
+                water_meter: formData.water_meter,
+                electric_meter: formData.electric_meter
+              })
+              .eq('id', editingItem.id);
+            if (error) throw error;
+            console.log('⚠️ Updated meters without history (columns missing)');
+          }
+        } catch (schemaError) {
+          // Fallback to basic meter update
+          const { error } = await supabase
+            .from('rooms')
+            .update({
+              water_meter: formData.water_meter,
+              electric_meter: formData.electric_meter
+            })
+            .eq('id', editingItem.id);
+          if (error) throw error;
+          console.log('⚠️ Fallback meter update (schema error)');
+        }
       }
 
       console.log('✅ Save successful, refreshing data...');
@@ -400,6 +464,9 @@ const EnhancedApp = () => {
           Professional Rental Management with Bill Calculation
         </p>
       </div>
+
+      {/* Database Setup Component - Temporarily visible to fix schema */}
+      <DatabaseSetup />
 
       {/* Loading State */}
       {loading && (
