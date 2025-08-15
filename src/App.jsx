@@ -37,39 +37,52 @@ const App = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      console.log('🔄 Starting data fetch...');
+      
       try {
+        console.log('📋 Fetching buildings...');
         const { data: buildingsData, error: buildingsError } = await supabase
           .from('buildings')
           .select('*');
+          
         if (buildingsError) {
           console.error("Buildings error:", buildingsError);
-          setError(`ข้อผิดพลาดในการดึงข้อมูลอาคาร: ${buildingsError.message}`);
+          setError(`Buildings error: ${buildingsError.message}`);
+          setBuildings([]);
         } else {
+          console.log('✅ Buildings fetched:', buildingsData);
           setBuildings(buildingsData || []);
           if (buildingsData && buildingsData.length > 0 && !selectedBuilding) {
             setSelectedBuilding(buildingsData[0].id);
           }
         }
 
+        console.log('🏠 Fetching rooms...');
         const { data: roomsData, error: roomsError } = await supabase
           .from('rooms')
           .select('*');
+          
         if (roomsError) {
           console.error("Rooms error:", roomsError);
-          setError(`ข้อผิดพลาดในการดึงข้อมูลห้อง: ${roomsError.message}`);
+          setError(`Rooms error: ${roomsError.message}`);
+          setRooms([]);
         } else {
+          console.log('✅ Rooms fetched:', roomsData);
           setRooms(roomsData || []);
         }
 
+        console.log('✅ Data fetch completed');
         setLoading(false);
+        
       } catch (e) {
         console.error("General error fetching data:", e);
-        setError(`เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: ${e.message}`);
+        setError(`Connection error: ${e.message}`);
         setLoading(false);
       }
     };
+    
     fetchData();
-  }, [selectedBuilding]);
+  }, []);
 
   // Function to refresh data
   const refreshData = async () => {
@@ -279,27 +292,54 @@ const App = () => {
             </p>
           </div>
 
-          {/* Connection Test - diagnose the actual issue */}
-          <ConnectionTest />
-          
-          {/* Database Setup - check and create tables if needed */}
-          <DatabaseSetup />
-          
-          {/* Debug Component - shows connection status and data */}
-          <DataDebugger />
+          {/* Simple Status Display */}
+          <div className="card p-6 mb-6 border-2 border-info/20 bg-info/5">
+            <h2 className="text-xl font-bold text-info mb-4">📊 Application Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="card p-4">
+                <h3 className="font-semibold text-gray-700 mb-2">Buildings</h3>
+                <p className="text-2xl font-bold text-primary">{buildings.length}</p>
+              </div>
+              <div className="card p-4">
+                <h3 className="font-semibold text-gray-700 mb-2">Rooms</h3>
+                <p className="text-2xl font-bold text-primary">{rooms.length}</p>
+              </div>
+              <div className="card p-4">
+                <h3 className="font-semibold text-gray-700 mb-2">Status</h3>
+                <p className="text-sm font-semibold text-success">✅ Connected</p>
+              </div>
+            </div>
+            
+            {buildings.length === 0 && (
+              <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 mb-4">
+                <h3 className="font-semibold text-warning mb-2">🎯 No Data Found</h3>
+                <p className="text-gray-700 mb-3">
+                  Your database is empty. Click the button below to create sample data and see the application in action!
+                </p>
+                <button
+                  onClick={createSampleData}
+                  className="btn-primary py-3 px-6 text-sm font-medium"
+                >
+                  🎯 Create Sample Data Now
+                </button>
+              </div>
+            )}
+            
+            {error && (
+              <div className="bg-error/10 border border-error/20 rounded-lg p-4">
+                <h3 className="font-semibold text-error mb-2">⚠️ Error</h3>
+                <p className="text-sm font-mono text-error">{error}</p>
+              </div>
+            )}
+          </div>
 
           {/* Tab Content */}
           {activeTab === 'dashboard' && (
             <>
-              {/* Dashboard component */}
-              <Dashboard rooms={rooms} />
+              {/* Dashboard component - only show if we have data */}
+              {rooms.length > 0 && <Dashboard rooms={rooms} />}
 
-              {buildings.length === 0 ? (
-                <WelcomeGuide 
-                  onCreateSampleData={createSampleData}
-                  onGoToBuildings={() => setActiveTab('buildings')}
-                />
-              ) : (
+              {buildings.length > 0 ? (
                 <>
                   {/* Building Selection */}
                   <div className="card p-6 mb-6">
@@ -341,11 +381,15 @@ const App = () => {
                       waterRate={WATER_RATE_PER_UNIT}
                       electricRate={ELECTRIC_RATE_PER_UNIT}
                     />
-                  )}
-                </>
-              )}
-            </>
-          )}
+                                     )}
+                 </>
+               ) : (
+                 <div className="text-center py-12">
+                   <p className="text-gray-500 text-lg">สร้างข้อมูลตัวอย่างเพื่อเริ่มใช้งาน</p>
+                 </div>
+               )}
+             </>
+           )}
 
           {activeTab === 'buildings' && (
             <BuildingManagement 
