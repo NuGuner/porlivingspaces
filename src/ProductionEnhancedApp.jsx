@@ -1,6 +1,7 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -24,14 +25,12 @@ const ProductionEnhancedApp = () => {
     return saved ? parseFloat(saved) : 8;
   });
 
-  // Revenue history tracking
-  const [revenueHistory, setRevenueHistory] = useState(() => {
-    const saved = localStorage.getItem('revenueHistory');
-    return saved ? JSON.parse(saved) : {};
-  });
+  // Revenue history from database
+  const [revenueHistory, setRevenueHistory] = useState({});
 
   useEffect(() => {
     fetchData();
+    fetchRevenueHistory();
   }, []);
 
   // Calculate current monthly revenue
@@ -54,18 +53,82 @@ const ProductionEnhancedApp = () => {
     return date.toISOString().slice(0, 7);
   };
 
-  // Update revenue history
-  const updateRevenueHistory = () => {
+  // Fetch revenue history from database
+  const fetchRevenueHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('revenue_history')
+        .select('*')
+        .order('month_key', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching revenue history:', error);
+        return;
+      }
+      
+      // Convert array to object for easy lookup
+      const historyMap = {};
+      data.forEach(record => {
+        historyMap[record.month_key] = record.total_revenue;
+      });
+      
+      setRevenueHistory(historyMap);
+    } catch (error) {
+      console.error('Failed to fetch revenue history:', error);
+    }
+  };
+
+  // Update revenue history in database
+  const updateRevenueHistory = async () => {
     const currentMonth = getCurrentMonthKey();
     const currentRevenue = calculateCurrentRevenue();
+    const occupiedRooms = rooms.filter(r => r.status === 'occupied');
     
-    const updatedHistory = {
-      ...revenueHistory,
-      [currentMonth]: currentRevenue
+    // Calculate breakdown
+    const totalRent = occupiedRooms.reduce((sum, room) => sum + (room.rent_price || 0), 0);
+    const totalWaterCost = occupiedRooms.reduce((sum, room) => {
+      const bill = calculateBill(room);
+      return sum + (bill?.water_cost || 0);
+    }, 0);
+    const totalElectricCost = occupiedRooms.reduce((sum, room) => {
+      const bill = calculateBill(room);
+      return sum + (bill?.electric_cost || 0);
+    }, 0);
+    
+    const revenueData = {
+      month_key: currentMonth,
+      total_revenue: currentRevenue,
+      occupied_rooms: occupiedRooms.length,
+      total_rent: totalRent,
+      total_water_cost: totalWaterCost,
+      total_electric_cost: totalElectricCost,
+      water_rate: waterRate,
+      electric_rate: electricRate
     };
     
-    setRevenueHistory(updatedHistory);
-    localStorage.setItem('revenueHistory', JSON.stringify(updatedHistory));
+    try {
+      // Use upsert (insert or update if exists)
+      const { error } = await supabase
+        .from('revenue_history')
+        .upsert(revenueData, { 
+          onConflict: 'month_key',
+          ignoreDuplicates: false 
+        });
+      
+      if (error) {
+        console.error('Error updating revenue history:', error);
+        return;
+      }
+      
+      // Update local state
+      setRevenueHistory(prev => ({
+        ...prev,
+        [currentMonth]: currentRevenue
+      }));
+      
+    } catch (error) {
+      console.error('Failed to update revenue history:', error);
+    }
   };
 
   // Get previous month revenue
@@ -540,6 +603,9 @@ const ProductionEnhancedApp = () => {
           </div>
         </div>
       </div>
+
+      {/* Database Setup Component - Temporary for revenue_history table creation */}
+      <DatabaseSetup />
 
       {/* Loading State */}
       {loading && (

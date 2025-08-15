@@ -72,15 +72,94 @@ const DatabaseSetup = () => {
     }
   };
 
+  const checkAndCreateRevenueHistoryTable = async () => {
+    try {
+      addLog('🔍 Checking revenue_history table...', 'info');
+      
+      // Try to select from revenue_history table
+      const { data, error } = await supabase
+        .from('revenue_history')
+        .select('*')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        addLog('❌ Revenue history table missing, creating it...', 'warning');
+        
+        // Create revenue_history table
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS revenue_history (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            month_key VARCHAR(7) NOT NULL UNIQUE, -- YYYY-MM format
+            total_revenue DECIMAL(10,2) NOT NULL DEFAULT 0,
+            occupied_rooms INTEGER NOT NULL DEFAULT 0,
+            total_rent DECIMAL(10,2) NOT NULL DEFAULT 0,
+            total_water_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+            total_electric_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+            water_rate DECIMAL(8,2) NOT NULL DEFAULT 15.00,
+            electric_rate DECIMAL(8,2) NOT NULL DEFAULT 8.00,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+          );
+          
+          -- Create index for efficient month queries
+          CREATE INDEX IF NOT EXISTS idx_revenue_history_month ON revenue_history(month_key);
+          
+          -- Create trigger for updated_at
+          CREATE OR REPLACE FUNCTION update_updated_at_column()
+          RETURNS TRIGGER AS $$
+          BEGIN
+              NEW.updated_at = TIMEZONE('utc'::text, NOW());
+              RETURN NEW;
+          END;
+          $$ language 'plpgsql';
+          
+          CREATE TRIGGER update_revenue_history_updated_at 
+            BEFORE UPDATE ON revenue_history 
+            FOR EACH ROW 
+            EXECUTE FUNCTION update_updated_at_column();
+        `;
+
+        const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+        
+        if (createError) {
+          addLog(`❌ Failed to create revenue_history table: ${createError.message}`, 'error');
+        } else {
+          addLog('✅ Revenue history table created successfully!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ Revenue history table already exists!', 'success');
+      } else {
+        addLog(`❌ Revenue history table check failed: ${error?.message}`, 'error');
+      }
+      
+    } catch (error) {
+      addLog(`❌ Revenue history table error: ${error.message}`, 'error');
+    }
+  };
+
   const manualSchemaUpdate = () => {
     addLog('📋 Manual Schema Update Instructions:', 'info');
     addLog('1. Go to your Supabase Dashboard', 'info');
     addLog('2. Navigate to SQL Editor', 'info');
-    addLog('3. Run this SQL:', 'info');
+    addLog('3. Run this SQL for meter columns:', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS previous_water_meter INTEGER DEFAULT 0;', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS previous_electric_meter INTEGER DEFAULT 0;', 'info');
-    addLog('4. Click "Run" to execute the SQL', 'info');
-    addLog('5. Refresh this page and try editing tenants again', 'info');
+    addLog('4. Run this SQL for revenue history table:', 'info');
+    addLog(`CREATE TABLE IF NOT EXISTS revenue_history (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      month_key VARCHAR(7) NOT NULL UNIQUE,
+      total_revenue DECIMAL(10,2) NOT NULL DEFAULT 0,
+      occupied_rooms INTEGER NOT NULL DEFAULT 0,
+      total_rent DECIMAL(10,2) NOT NULL DEFAULT 0,
+      total_water_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+      total_electric_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+      water_rate DECIMAL(8,2) NOT NULL DEFAULT 15.00,
+      electric_rate DECIMAL(8,2) NOT NULL DEFAULT 8.00,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+    );`, 'info');
+    addLog('5. Click "Run" to execute the SQL', 'info');
+    addLog('6. Refresh this page and try again', 'info');
   };
 
   const setupDatabase = async () => {
@@ -114,6 +193,9 @@ const DatabaseSetup = () => {
         // Now check and add meter columns
         await checkAndAddMeterColumns();
       }
+
+      // Check and create revenue history table
+      await checkAndCreateRevenueHistoryTable();
 
       addLog('✅ Database setup completed!', 'success');
       setSetupStatus('completed');
@@ -182,6 +264,44 @@ const DatabaseSetup = () => {
         addLog(`❌ Rooms creation failed: ${roomsError.message}`, 'error');
       } else {
         addLog(`✅ Created ${rooms.length} sample rooms`, 'success');
+        
+        // Create sample revenue history
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const previousMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+        
+        const sampleRevenue = [
+          {
+            month_key: previousMonth,
+            total_revenue: 22000,
+            occupied_rooms: 2,
+            total_rent: 15500,
+            total_water_cost: 3000,
+            total_electric_cost: 3500,
+            water_rate: 15.00,
+            electric_rate: 8.00
+          },
+          {
+            month_key: currentMonth,
+            total_revenue: 25500,
+            occupied_rooms: 2,
+            total_rent: 15500,
+            total_water_cost: 4000,
+            total_electric_cost: 6000,
+            water_rate: 15.00,
+            electric_rate: 8.00
+          }
+        ];
+
+        const { error: revenueError } = await supabase
+          .from('revenue_history')
+          .insert(sampleRevenue);
+
+        if (revenueError) {
+          addLog(`⚠️ Revenue history creation failed: ${revenueError.message}`, 'warning');
+        } else {
+          addLog(`✅ Created sample revenue history`, 'success');
+        }
+        
         addLog('🎉 Sample data creation completed!', 'success');
       }
 
@@ -295,8 +415,8 @@ const DatabaseSetup = () => {
         fontSize: '12px',
         color: '#1e40af'
       }}>
-        <strong>💡 About This Tool:</strong> This fixes the "Could not find column" error by adding missing 
-        meter history columns to your database. If automatic setup fails, use the manual instructions.
+        <strong>💡 About This Tool:</strong> This creates the revenue_history table for storing monthly revenue data 
+        and fixes any missing meter history columns. All revenue tracking will be stored in Supabase database instead of localStorage.
       </div>
     </div>
   );
