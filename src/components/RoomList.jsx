@@ -8,12 +8,16 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { format, parseISO } from 'date-fns';
+import ErrorNotification from './ErrorNotification';
+import BillReceipt from './BillReceipt';
 
 const RoomList = ({ rooms, waterRate, electricRate }) => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [currentRoom, setCurrentRoom] = useState(null);
-  const [_error, setError] = useState('');
+  const [error, setError] = useState('');
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
 
   // State for new room or edited room data
   const [roomData, setRoomData] = useState({
@@ -180,8 +184,18 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
     }
   };
 
+  // Function to show receipt
+  const showBillReceipt = (room, bill) => {
+    setReceiptData({ room, bill });
+    setShowReceipt(true);
+  };
+
   return (
     <>
+      <ErrorNotification 
+        error={error} 
+        onClose={() => setError('')}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {rooms.map(room => (
           <div key={room.id} className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 transition-transform transform hover:scale-105 duration-200">
@@ -228,12 +242,20 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
                     สร้างบิล
                   </button>
                   {room.current_bill && (
-                    <button
-                      onClick={() => handlePayment(room)}
-                      className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors duration-200"
-                    >
-                      ชำระแล้ว
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handlePayment(room)}
+                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors duration-200"
+                      >
+                        ชำระแล้ว
+                      </button>
+                      <button
+                        onClick={() => showBillReceipt(room, room.current_bill)}
+                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-indigo-500 text-white hover:bg-indigo-600 transition-colors duration-200"
+                      >
+                        ใบเสร็จ
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => handleCheckout(room)}
@@ -391,6 +413,18 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Bill Receipt Modal */}
+      {showReceipt && receiptData && (
+        <BillReceipt
+          room={receiptData.room}
+          bill={receiptData.bill}
+          onClose={() => {
+            setShowReceipt(false);
+            setReceiptData(null);
+          }}
+        />
       )}
     </>
   );

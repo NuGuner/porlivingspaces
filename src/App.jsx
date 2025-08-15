@@ -9,6 +9,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Dashboard from './components/Dashboard';
 import RoomList from './components/RoomList';
+import ErrorNotification from './components/ErrorNotification';
+import BuildingManagement from './components/BuildingManagement';
+import DataManagement from './components/DataManagement';
+import LoadingSpinner from './components/LoadingSpinner';
 
 // Constants for bill calculation
 const WATER_RATE_PER_UNIT = 15;
@@ -21,6 +25,7 @@ const App = () => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // useEffect to fetch initial data on component mount
   useEffect(() => {
@@ -52,11 +57,33 @@ const App = () => {
     fetchData();
   }, [selectedBuilding]);
 
+  // Function to refresh data
+  const refreshData = async () => {
+    try {
+      const { data: buildingsData, error: buildingsError } = await supabase
+        .from('buildings')
+        .select('*');
+      if (buildingsError) throw buildingsError;
+      setBuildings(buildingsData);
+
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*');
+      if (roomsError) throw roomsError;
+      setRooms(roomsData);
+    } catch (e) {
+      console.error("Error refreshing data:", e);
+      setError("เกิดข้อผิดพลาดในการรีเฟรชข้อมูล");
+    }
+  };
+
   // UI
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-xl font-bold text-gray-700">กำลังโหลดข้อมูล...</div>
+        <div className="bg-white p-8 rounded-2xl shadow-lg">
+          <LoadingSpinner size="large" text="กำลังโหลดข้อมูล..." />
+        </div>
       </div>
     );
   }
@@ -67,52 +94,100 @@ const App = () => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-extrabold text-center mb-6 text-gray-900">ระบบจัดการห้องเช่า</h1>
         
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
+        <ErrorNotification 
+          error={error} 
+          onClose={() => setError('')}
+        />
 
-        {/* Dashboard component */}
-        <Dashboard rooms={rooms} />
-
-        {/* Building tabs and add new room button */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex space-x-2">
-            {buildings.map(building => (
-              <button
-                key={building.id}
-                onClick={() => setSelectedBuilding(building.id)}
-                className={`py-2 px-4 rounded-lg font-semibold transition-colors duration-200 ${
-                  selectedBuilding === building.id
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-blue-100 border border-gray-300'
-                }`}
-              >
-                {building.name}
-              </button>
-            ))}
-            <button
-              // onClick={handleAddBuilding}
-              className="py-2 px-4 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200 border border-gray-300"
-            >
-              + เพิ่มอาคาร
-            </button>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6">
           <button
-            // onClick={() => openModal('add')}
-            className="py-2 px-6 rounded-lg font-semibold bg-green-600 text-white shadow-md hover:bg-green-700 transition-colors duration-200"
+            onClick={() => setActiveTab('dashboard')}
+            className={`py-2 px-3 md:px-4 rounded-lg font-semibold transition-colors duration-200 text-sm md:text-base ${
+              activeTab === 'dashboard'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-white text-gray-700 hover:bg-blue-100 border border-gray-300'
+            }`}
           >
-            + เพิ่มห้องใหม่
+            <span className="hidden sm:inline">📊 แดชบอร์ด</span>
+            <span className="sm:hidden">📊</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('buildings')}
+            className={`py-2 px-3 md:px-4 rounded-lg font-semibold transition-colors duration-200 text-sm md:text-base ${
+              activeTab === 'buildings'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-white text-gray-700 hover:bg-blue-100 border border-gray-300'
+            }`}
+          >
+            <span className="hidden sm:inline">🏢 จัดการอาคาร</span>
+            <span className="sm:hidden">🏢</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`py-2 px-3 md:px-4 rounded-lg font-semibold transition-colors duration-200 text-sm md:text-base ${
+              activeTab === 'data'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-white text-gray-700 hover:bg-blue-100 border border-gray-300'
+            }`}
+          >
+            <span className="hidden sm:inline">💾 จัดการข้อมูล</span>
+            <span className="sm:hidden">💾</span>
           </button>
         </div>
 
-        {/* Room List component */}
-        <RoomList
-          rooms={rooms.filter(room => room.building_id === selectedBuilding)}
-          waterRate={WATER_RATE_PER_UNIT}
-          electricRate={ELECTRIC_RATE_PER_UNIT}
-        />
+        {/* Tab Content */}
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Dashboard component */}
+            <Dashboard rooms={rooms} />
+
+            {/* Building tabs and add new room button */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+              <div className="flex flex-wrap gap-2">
+                {buildings.map(building => (
+                  <button
+                    key={building.id}
+                    onClick={() => setSelectedBuilding(building.id)}
+                    className={`py-2 px-3 md:px-4 rounded-lg font-semibold transition-colors duration-200 text-sm md:text-base ${
+                      selectedBuilding === building.id
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white text-gray-700 hover:bg-blue-100 border border-gray-300'
+                    }`}
+                  >
+                    {building.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                // onClick={() => openModal('add')}
+                className="py-2 px-4 md:px-6 rounded-lg font-semibold bg-green-600 text-white shadow-md hover:bg-green-700 transition-colors duration-200 text-sm md:text-base w-full sm:w-auto"
+              >
+                + เพิ่มห้องใหม่
+              </button>
+            </div>
+
+            {/* Room List component */}
+            <RoomList
+              rooms={rooms.filter(room => room.building_id === selectedBuilding)}
+              waterRate={WATER_RATE_PER_UNIT}
+              electricRate={ELECTRIC_RATE_PER_UNIT}
+            />
+          </>
+        )}
+
+        {activeTab === 'buildings' && (
+          <BuildingManagement 
+            buildings={buildings} 
+            onBuildingUpdate={refreshData}
+          />
+        )}
+
+        {activeTab === 'data' && (
+          <DataManagement 
+            onDataUpdate={refreshData}
+          />
+        )}
       </div>
     </div>
   );
