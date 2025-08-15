@@ -13,6 +13,8 @@ import ErrorNotification from './components/ErrorNotification';
 import BuildingManagement from './components/BuildingManagement';
 import DataManagement from './components/DataManagement';
 import LoadingSpinner from './components/LoadingSpinner';
+import DataDebugger from './components/DataDebugger';
+import EmptyState from './components/EmptyState';
 
 // Constants for bill calculation
 const WATER_RATE_PER_UNIT = 15;
@@ -35,22 +37,30 @@ const App = () => {
         const { data: buildingsData, error: buildingsError } = await supabase
           .from('buildings')
           .select('*');
-        if (buildingsError) throw buildingsError;
-        setBuildings(buildingsData);
-        if (buildingsData.length > 0 && !selectedBuilding) {
-          setSelectedBuilding(buildingsData[0].id);
+        if (buildingsError) {
+          console.error("Buildings error:", buildingsError);
+          setError(`ข้อผิดพลาดในการดึงข้อมูลอาคาร: ${buildingsError.message}`);
+        } else {
+          setBuildings(buildingsData || []);
+          if (buildingsData && buildingsData.length > 0 && !selectedBuilding) {
+            setSelectedBuilding(buildingsData[0].id);
+          }
         }
 
         const { data: roomsData, error: roomsError } = await supabase
           .from('rooms')
           .select('*');
-        if (roomsError) throw roomsError;
-        setRooms(roomsData);
+        if (roomsError) {
+          console.error("Rooms error:", roomsError);
+          setError(`ข้อผิดพลาดในการดึงข้อมูลห้อง: ${roomsError.message}`);
+        } else {
+          setRooms(roomsData || []);
+        }
 
         setLoading(false);
       } catch (e) {
-        console.error("Error fetching data:", e);
-        setError("เกิดข้อผิดพลาดในการดึงข้อมูล. กรุณาลองใหม่อีกครั้ง.");
+        console.error("General error fetching data:", e);
+        setError(`เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: ${e.message}`);
         setLoading(false);
       }
     };
@@ -148,46 +158,65 @@ const App = () => {
           </button>
         </div>
 
+        {/* Debug Component - shows connection status and data */}
+        <DataDebugger />
+
         {/* Tab Content */}
         {activeTab === 'dashboard' && (
           <>
             {/* Dashboard component */}
             <Dashboard rooms={rooms} />
 
-            {/* Building tabs and add new room button */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-8">
-              <div className="flex flex-wrap gap-3">
-                {buildings.map(building => (
+            {buildings.length === 0 ? (
+              <EmptyState 
+                type="buildings"
+                onAction={() => setActiveTab('buildings')}
+              />
+            ) : (
+              <>
+                {/* Building tabs and add new room button */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-8">
+                  <div className="flex flex-wrap gap-3">
+                    {buildings.map(building => (
+                      <button
+                        key={building.id}
+                        onClick={() => setSelectedBuilding(building.id)}
+                        className={`btn-modern py-3 px-5 font-medium transition-all duration-300 text-sm card-hover ${
+                          selectedBuilding === building.id
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg transform scale-105'
+                            : 'glass text-gray-700 hover:bg-white/90 hover:shadow-md'
+                        }`}
+                      >
+                        {building.name}
+                      </button>
+                    ))}
+                  </div>
                   <button
-                    key={building.id}
-                    onClick={() => setSelectedBuilding(building.id)}
-                    className={`btn-modern py-3 px-5 font-medium transition-all duration-300 text-sm card-hover ${
-                      selectedBuilding === building.id
-                        ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg transform scale-105'
-                        : 'glass text-gray-700 hover:bg-white/90 hover:shadow-md'
-                    }`}
+                    // onClick={() => openModal('add')}
+                    className="btn-modern py-3 px-6 md:px-8 font-medium bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm md:text-base w-full sm:w-auto animate-glow"
                   >
-                    {building.name}
+                    <span className="flex items-center gap-2 justify-center">
+                      <span className="text-lg">✨</span>
+                      เพิ่มห้องใหม่
+                    </span>
                   </button>
-                ))}
-              </div>
-              <button
-                // onClick={() => openModal('add')}
-                className="btn-modern py-3 px-6 md:px-8 font-medium bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 text-sm md:text-base w-full sm:w-auto animate-glow"
-              >
-                <span className="flex items-center gap-2 justify-center">
-                  <span className="text-lg">✨</span>
-                  เพิ่มห้องใหม่
-                </span>
-              </button>
-            </div>
+                </div>
 
-            {/* Room List component */}
-            <RoomList
-              rooms={rooms.filter(room => room.building_id === selectedBuilding)}
-              waterRate={WATER_RATE_PER_UNIT}
-              electricRate={ELECTRIC_RATE_PER_UNIT}
-            />
+                {/* Room List component */}
+                {rooms.filter(room => room.building_id === selectedBuilding).length === 0 ? (
+                  <EmptyState 
+                    type="rooms"
+                    actionText="เริ่มเพิ่มห้องเช่า"
+                  />
+                ) : (
+                  <RoomList
+                    rooms={rooms.filter(room => room.building_id === selectedBuilding)}
+                    waterRate={WATER_RATE_PER_UNIT}
+                    electricRate={ELECTRIC_RATE_PER_UNIT}
+                  />
+                )}
+              </>
+            )}
           </>
         )}
 
