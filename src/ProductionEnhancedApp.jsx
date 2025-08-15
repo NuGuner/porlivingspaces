@@ -226,6 +226,212 @@ const ProductionEnhancedApp = () => {
     }
   };
 
+  // Print bill function
+  const printBill = () => {
+    const printWindow = window.open('', '_blank');
+    const bill = calculateBill(editingItem);
+    const tenantInfo = getRoomTenantInfo(editingItem);
+    
+    if (!bill || !tenantInfo.isOccupied) return;
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice - Room ${editingItem.room_number}</title>
+        <style>
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+          }
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.4;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 5px;
+          }
+          .invoice-title {
+            font-size: 20px;
+            color: #059669;
+            margin-top: 15px;
+          }
+          .invoice-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+          }
+          .tenant-section, .property-section {
+            flex: 1;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 0 10px;
+          }
+          .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+          }
+          .info-row {
+            margin: 5px 0;
+            font-size: 14px;
+          }
+          .info-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+          }
+          .billing-section {
+            margin-top: 30px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+          .billing-header {
+            background: #2563eb;
+            color: white;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+          }
+          .billing-content {
+            padding: 20px;
+          }
+          .billing-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #f3f4f6;
+          }
+          .billing-row.total {
+            border-top: 2px solid #2563eb;
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 15px;
+            padding-top: 10px;
+          }
+          .utility-detail {
+            font-size: 12px;
+            color: #6b7280;
+            margin-left: 20px;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+            font-size: 12px;
+            color: #6b7280;
+          }
+          .print-date {
+            text-align: right;
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-date">Printed: ${new Date().toLocaleString()}</div>
+        
+        <div class="header">
+          <div class="company-name">🏢 PorLivingSpaces Property Management</div>
+          <div class="invoice-title">Monthly Rental Invoice</div>
+        </div>
+
+        <div class="invoice-info">
+          <div class="tenant-section">
+            <div class="section-title">👤 Tenant Information</div>
+            <div class="info-row"><span class="info-label">Name:</span> ${tenantInfo.tenant.full_name}</div>
+            <div class="info-row"><span class="info-label">Tenant ID:</span> ${tenantInfo.tenant.tenant_id_number}</div>
+            <div class="info-row"><span class="info-label">Phone:</span> ${tenantInfo.tenant.phone || 'Not provided'}</div>
+            ${tenantInfo.tenant.email ? `<div class="info-row"><span class="info-label">Email:</span> ${tenantInfo.tenant.email}</div>` : ''}
+            ${tenantInfo.tenant.address ? `<div class="info-row"><span class="info-label">Address:</span> ${tenantInfo.tenant.address}</div>` : ''}
+            ${tenantInfo.tenant.emergency_contact_name ? `<div class="info-row"><span class="info-label">Emergency:</span> ${tenantInfo.tenant.emergency_contact_name} (${tenantInfo.tenant.emergency_contact_phone})</div>` : ''}
+          </div>
+
+          <div class="property-section">
+            <div class="section-title">🏠 Property Information</div>
+            <div class="info-row"><span class="info-label">Room:</span> ${editingItem.room_number}</div>
+            <div class="info-row"><span class="info-label">Building:</span> ${buildings.find(b => b.id === editingItem.building_id)?.name || 'Unknown'}</div>
+            <div class="info-row"><span class="info-label">Invoice Date:</span> ${new Date().toLocaleDateString()}</div>
+            <div class="info-row"><span class="info-label">Period:</span> ${bill.month}</div>
+            <div class="info-row"><span class="info-label">Due Date:</span> ${new Date(bill.due_date).toLocaleDateString()}</div>
+            <div class="info-row"><span class="info-label">Lease Period:</span> ${bill.lease_period}</div>
+            ${tenantInfo.lease.security_deposit > 0 ? `<div class="info-row"><span class="info-label">Deposit:</span> ฿${tenantInfo.lease.security_deposit.toLocaleString()}</div>` : ''}
+          </div>
+        </div>
+
+        <div class="billing-section">
+          <div class="billing-header">💰 Monthly Charges Breakdown</div>
+          <div class="billing-content">
+            <div class="billing-row">
+              <span>📍 Monthly Rent</span>
+              <span>฿${bill.rent_amount.toLocaleString()}</span>
+            </div>
+            
+            <div class="billing-row">
+              <span>💧 Water Usage (${bill.water_units} units)</span>
+              <span>฿${bill.water_cost.toLocaleString()}</span>
+            </div>
+            <div class="utility-detail">
+              ${bill.water_units === 0 ? 'No usage' :
+                bill.water_units <= waterMinUnits ? `Minimum charge (1-${waterMinUnits} units)` :
+                `Minimum ฿${waterMinCharge} + ${bill.water_units - waterMinUnits} units × ฿${waterRate}`}
+            </div>
+            
+            <div class="billing-row">
+              <span>⚡ Electric Usage (${bill.electric_units} units)</span>
+              <span>฿${bill.electric_cost.toLocaleString()}</span>
+            </div>
+            <div class="utility-detail">
+              ${bill.electric_units === 0 ? 'No usage' :
+                bill.electric_units <= electricMinUnits ? `Minimum charge (1-${electricMinUnits} units)` :
+                `Minimum ฿${electricMinCharge} + ${bill.electric_units - electricMinUnits} units × ฿${electricRate}`}
+            </div>
+            
+            <div class="billing-row total">
+              <span>💳 Total Amount Due</span>
+              <span>฿${bill.total_amount.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>Payment Instructions:</strong></p>
+          <p>Please ensure payment is made by the due date to avoid late fees.</p>
+          <p>For questions regarding this invoice, please contact property management.</p>
+          <p style="margin-top: 15px;">Thank you for choosing PorLivingSpaces! 🏠</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   // Get tenant and lease information for a room
   const getRoomTenantInfo = (room) => {
     const activeLease = tenantLeases.find(lease => 
@@ -1415,7 +1621,13 @@ const ProductionEnhancedApp = () => {
             )}
 
             {modalType === 'bill' && (
-              <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '20px'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '20px'}}>
+                <button 
+                  onClick={printBill} 
+                  style={{...successButtonStyle, display: 'flex', alignItems: 'center', gap: '8px'}}
+                >
+                  🖨️ Print Invoice
+                </button>
                 <button onClick={closeModal} style={buttonStyle}>
                   Close
                 </button>
