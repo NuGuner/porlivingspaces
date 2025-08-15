@@ -24,9 +24,75 @@ const ProductionEnhancedApp = () => {
     return saved ? parseFloat(saved) : 8;
   });
 
+  // Revenue history tracking
+  const [revenueHistory, setRevenueHistory] = useState(() => {
+    const saved = localStorage.getItem('revenueHistory');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Calculate current monthly revenue
+  const calculateCurrentRevenue = () => {
+    return rooms.filter(r => r.status === 'occupied').reduce((sum, room) => {
+      const bill = calculateBill(room);
+      return sum + (bill?.total_amount || 0);
+    }, 0);
+  };
+
+  // Get current month key
+  const getCurrentMonthKey = () => {
+    return new Date().toISOString().slice(0, 7); // YYYY-MM format
+  };
+
+  // Get previous month key
+  const getPreviousMonthKey = () => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 1);
+    return date.toISOString().slice(0, 7);
+  };
+
+  // Update revenue history
+  const updateRevenueHistory = () => {
+    const currentMonth = getCurrentMonthKey();
+    const currentRevenue = calculateCurrentRevenue();
+    
+    const updatedHistory = {
+      ...revenueHistory,
+      [currentMonth]: currentRevenue
+    };
+    
+    setRevenueHistory(updatedHistory);
+    localStorage.setItem('revenueHistory', JSON.stringify(updatedHistory));
+  };
+
+  // Get previous month revenue
+  const getPreviousMonthRevenue = () => {
+    const previousMonth = getPreviousMonthKey();
+    return revenueHistory[previousMonth] || 0;
+  };
+
+  // Calculate revenue change percentage
+  const getRevenueChange = () => {
+    const current = calculateCurrentRevenue();
+    const previous = getPreviousMonthRevenue();
+    
+    if (previous === 0) return { change: 0, percentage: 0 };
+    
+    const change = current - previous;
+    const percentage = ((change / previous) * 100);
+    
+    return { change, percentage };
+  };
+
+  // Update revenue history when rooms change
+  useEffect(() => {
+    if (rooms.length > 0) {
+      updateRevenueHistory();
+    }
+  }, [rooms, waterRate, electricRate]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -494,42 +560,72 @@ const ProductionEnhancedApp = () => {
       {/* Main Content - Only show when not loading */}
       {!loading && (
         <>
-          {/* Statistics */}
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px'}}>
-            <div style={statCardStyle}>
-              <h3 style={{margin: 0, color: '#2563eb'}}>🏢 Buildings</h3>
-              <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
-                {buildings.length}
-              </p>
-            </div>
-            <div style={statCardStyle}>
-              <h3 style={{margin: 0, color: '#2563eb'}}>🏠 Total Rooms</h3>
-              <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
-                {rooms.length}
-              </p>
-            </div>
-            <div style={statCardStyle}>
-              <h3 style={{margin: 0, color: '#059669'}}>✅ Occupied</h3>
-              <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
-                {rooms.filter(r => r.status === 'occupied').length}
-              </p>
-            </div>
-            <div style={statCardStyle}>
-              <h3 style={{margin: 0, color: '#059669'}}>🏠 Vacant</h3>
-              <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
-                {rooms.filter(r => r.status === 'vacant').length}
-              </p>
-            </div>
-            <div style={statCardStyle}>
-              <h3 style={{margin: 0, color: '#d97706'}}>💰 Monthly Revenue</h3>
-              <p style={{fontSize: '24px', margin: '10px 0', fontWeight: 'bold'}}>
-                ฿{rooms.filter(r => r.status === 'occupied').reduce((sum, room) => {
-                  const bill = calculateBill(room);
-                  return sum + (bill?.total_amount || 0);
-                }, 0).toLocaleString()}
-              </p>
-            </div>
-          </div>
+                     {/* Statistics */}
+           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px'}}>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#2563eb'}}>🏢 Buildings</h3>
+               <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
+                 {buildings.length}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#2563eb'}}>🏠 Total Rooms</h3>
+               <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
+                 {rooms.length}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#059669'}}>✅ Occupied</h3>
+               <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
+                 {rooms.filter(r => r.status === 'occupied').length}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#059669'}}>🏠 Vacant</h3>
+               <p style={{fontSize: '32px', margin: '10px 0', fontWeight: 'bold'}}>
+                 {rooms.filter(r => r.status === 'vacant').length}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#d97706'}}>💰 Current Revenue</h3>
+               <p style={{fontSize: '24px', margin: '10px 0', fontWeight: 'bold'}}>
+                 ฿{calculateCurrentRevenue().toLocaleString()}
+               </p>
+               <p style={{fontSize: '12px', margin: 0, color: '#6b7280'}}>
+                 {getCurrentMonthKey()}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: '#6366f1'}}>📈 Previous Revenue</h3>
+               <p style={{fontSize: '24px', margin: '10px 0', fontWeight: 'bold'}}>
+                 ฿{getPreviousMonthRevenue().toLocaleString()}
+               </p>
+               <p style={{fontSize: '12px', margin: 0, color: '#6b7280'}}>
+                 {getPreviousMonthKey()}
+               </p>
+             </div>
+             <div style={statCardStyle}>
+               <h3 style={{margin: 0, color: getRevenueChange().change >= 0 ? '#059669' : '#dc2626'}}>
+                 {getRevenueChange().change >= 0 ? '📈' : '📉'} Revenue Change
+               </h3>
+               <p style={{
+                 fontSize: '20px', 
+                 margin: '10px 0', 
+                 fontWeight: 'bold',
+                 color: getRevenueChange().change >= 0 ? '#059669' : '#dc2626'
+               }}>
+                 {getRevenueChange().change >= 0 ? '+' : ''}฿{Math.abs(getRevenueChange().change).toLocaleString()}
+               </p>
+               <p style={{
+                 fontSize: '14px', 
+                 margin: 0, 
+                 fontWeight: 'bold',
+                 color: getRevenueChange().change >= 0 ? '#059669' : '#dc2626'
+               }}>
+                 {getRevenueChange().change >= 0 ? '+' : ''}{getRevenueChange().percentage.toFixed(1)}%
+               </p>
+             </div>
+           </div>
 
           {/* Buildings Section */}
           <div style={cardStyle}>
