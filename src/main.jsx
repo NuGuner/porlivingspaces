@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import WorkingApp from './WorkingApp.jsx'
+import ProductionApp from './ProductionApp.jsx'
 
-// Switch to WorkingApp - the fully functional version
+// Production App with full CRUD functionality
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <WorkingApp />
+    <ProductionApp />
   </StrictMode>,
 )
