@@ -1,7 +1,6 @@
 // Enhanced App with meter reading history and bill calculation
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import DatabaseSetup from './components/DatabaseSetup';
 
 const EnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
@@ -509,14 +508,29 @@ const EnhancedApp = () => {
         </div>
       </div>
 
-      {/* Database Setup Component - Temporarily visible to fix schema */}
-      <DatabaseSetup />
+      
 
       {/* Loading State */}
       {loading && (
         <div style={{...cardStyle, textAlign: 'center'}}>
           <h2>⏳ Loading...</h2>
           <p>Loading your property data...</p>
+        </div>
+      )}
+
+      {/* Debug Status - Temporary */}
+      {!loading && (
+        <div style={{...cardStyle, backgroundColor: '#fee2e2', border: '2px solid #dc2626', marginBottom: '20px'}}>
+          <h3 style={{margin: '0 0 10px 0', color: '#dc2626'}}>🔍 Debug Status</h3>
+          <div style={{fontSize: '14px', fontFamily: 'monospace'}}>
+            <p>Loading: {loading.toString()}</p>
+            <p>Buildings count: {buildings.length}</p>
+            <p>Rooms count: {rooms.length}</p>
+            <p>Selected building: {selectedBuilding || 'none'}</p>
+            <p>Error: {error || 'none'}</p>
+            <p>Water rate: {waterRate}</p>
+            <p>Electric rate: {electricRate}</p>
+          </div>
         </div>
       )}
 
