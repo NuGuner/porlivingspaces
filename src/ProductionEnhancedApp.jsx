@@ -1,11 +1,12 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [tenants, setTenants] = useState([]);
+  const [tenantLeases, setTenantLeases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -189,12 +190,61 @@ const ProductionEnhancedApp = () => {
       } else {
         setRooms(roomsData || []);
       }
+
+      // Fetch tenants data
+      const { data: tenantsData, error: tenantsError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('is_active', true);
+        
+      if (tenantsError) {
+        setError(`Tenants: ${tenantsError.message}`);
+      } else {
+        setTenants(tenantsData || []);
+      }
+
+      // Fetch tenant leases with tenant and room details
+      const { data: leasesData, error: leasesError } = await supabase
+        .from('tenant_leases')
+        .select(`
+          *,
+          tenant:tenants(*),
+          room:rooms(*)
+        `)
+        .eq('lease_status', 'active');
+        
+      if (leasesError) {
+        setError(`Leases: ${leasesError.message}`);
+      } else {
+        setTenantLeases(leasesData || []);
+      }
       
       setLoading(false);
     } catch (error) {
       setError(`Failed to load data: ${error.message}`);
       setLoading(false);
     }
+  };
+
+  // Get tenant and lease information for a room
+  const getRoomTenantInfo = (room) => {
+    const activeLease = tenantLeases.find(lease => 
+      lease.room_id === room.id && lease.lease_status === 'active'
+    );
+    
+    if (activeLease) {
+      return {
+        tenant: activeLease.tenant,
+        lease: activeLease,
+        isOccupied: true
+      };
+    }
+    
+    return {
+      tenant: null,
+      lease: null, 
+      isOccupied: false
+    };
   };
 
   // Calculate tiered utility costs
@@ -206,7 +256,8 @@ const ProductionEnhancedApp = () => {
 
   // Calculate bill based on current and previous meter readings with tiered pricing
   const calculateBill = (room) => {
-    if (!room.tenant_name || room.status !== 'occupied') return null;
+    const tenantInfo = getRoomTenantInfo(room);
+    if (!tenantInfo.isOccupied) return null;
 
     const previousWater = room.previous_water_meter !== undefined ? room.previous_water_meter || 0 : 0;
     const previousElectric = room.previous_electric_meter !== undefined ? room.previous_electric_meter || 0 : 0;
@@ -220,8 +271,10 @@ const ProductionEnhancedApp = () => {
     
     const totalAmount = (room.rent_price || 0) + waterCost + electricCost;
 
+    const { tenant, lease } = tenantInfo;
+    
     return {
-      rent_amount: room.rent_price || 0,
+      rent_amount: lease?.monthly_rent || room.rent_price || 0,
       water_units: waterUnits,
       water_cost: waterCost,
       water_rate: waterRate,
@@ -236,10 +289,20 @@ const ProductionEnhancedApp = () => {
       month: new Date().toISOString().slice(0, 7),
       due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       has_meter_history: room.previous_water_meter !== undefined && room.previous_electric_meter !== undefined,
-      tenant_start_date: room.tenant_start_date,
-      tenant_end_date: room.tenant_end_date,
-      lease_period: room.tenant_start_date ? 
-        `${new Date(room.tenant_start_date).toLocaleDateString()} - ${room.tenant_end_date ? new Date(room.tenant_end_date).toLocaleDateString() : 'Ongoing'}` : 
+      // Tenant information from new system
+      tenant_id: tenant?.tenant_id_number,
+      tenant_name: tenant?.full_name,
+      tenant_phone: tenant?.phone,
+      tenant_email: tenant?.email,
+      tenant_address: tenant?.address,
+      tenant_emergency_contact: tenant?.emergency_contact_name,
+      tenant_emergency_phone: tenant?.emergency_contact_phone,
+      // Lease information  
+      lease_start_date: lease?.lease_start_date,
+      lease_end_date: lease?.lease_end_date,
+      security_deposit: lease?.security_deposit,
+      lease_period: lease?.lease_start_date ? 
+        `${new Date(lease.lease_start_date).toLocaleDateString()} - ${lease.lease_end_date ? new Date(lease.lease_end_date).toLocaleDateString() : 'Ongoing'}` : 
         'Not specified'
     };
   };
@@ -870,24 +933,39 @@ const ProductionEnhancedApp = () => {
                           <p style={{margin: '2px 0', fontSize: '14px'}}>
                             <strong>Rent:</strong> ฿{room.rent_price?.toLocaleString()}
                           </p>
-                          {room.tenant_name && (
-                            <>
-                              <p style={{margin: '2px 0', fontSize: '14px'}}>
-                                <strong>Tenant:</strong> {room.tenant_name}
-                              </p>
-                              <p style={{margin: '2px 0', fontSize: '14px'}}>
-                                <strong>Phone:</strong> {room.tenant_phone}
-                              </p>
-                              {room.tenant_start_date && (
+                          {(() => {
+                            const tenantInfo = getRoomTenantInfo(room);
+                            return tenantInfo.isOccupied && (
+                              <>
                                 <p style={{margin: '2px 0', fontSize: '14px'}}>
-                                  <strong>📅 Lease:</strong> {new Date(room.tenant_start_date).toLocaleDateString()} - {room.tenant_end_date ? new Date(room.tenant_end_date).toLocaleDateString() : 'Ongoing'}
+                                  <strong>Tenant:</strong> {tenantInfo.tenant.full_name} ({tenantInfo.tenant.tenant_id_number})
                                 </p>
-                              )}
-                            </>
-                          )}
+                                <p style={{margin: '2px 0', fontSize: '14px'}}>
+                                  <strong>Phone:</strong> {tenantInfo.tenant.phone || 'Not provided'}
+                                </p>
+                                {tenantInfo.tenant.email && (
+                                  <p style={{margin: '2px 0', fontSize: '14px'}}>
+                                    <strong>Email:</strong> {tenantInfo.tenant.email}
+                                  </p>
+                                )}
+                                {tenantInfo.lease.lease_start_date && (
+                                  <p style={{margin: '2px 0', fontSize: '14px'}}>
+                                    <strong>📅 Lease:</strong> {new Date(tenantInfo.lease.lease_start_date).toLocaleDateString()} - {tenantInfo.lease.lease_end_date ? new Date(tenantInfo.lease.lease_end_date).toLocaleDateString() : 'Ongoing'}
+                                  </p>
+                                )}
+                                {tenantInfo.lease.security_deposit > 0 && (
+                                  <p style={{margin: '2px 0', fontSize: '14px'}}>
+                                    <strong>💰 Deposit:</strong> ฿{tenantInfo.lease.security_deposit.toLocaleString()}
+                                  </p>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
 
-                        {room.status === 'occupied' && bill && (
+                                                  {(() => {
+                            const tenantInfo = getRoomTenantInfo(room);
+                            return tenantInfo.isOccupied && bill && (
                                                      <div style={{backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '6px', marginBottom: '15px'}}>
                              <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#059669'}}>💰 Monthly Bill</h4>
                              <div style={{fontSize: '12px'}}>
@@ -909,7 +987,8 @@ const ProductionEnhancedApp = () => {
                                <p style={{margin: '5px 0 0 0', fontWeight: 'bold', fontSize: '14px'}}>Total: ฿{bill.total_amount.toLocaleString()}</p>
                              </div>
                            </div>
-                        )}
+                            );
+                          })()}
 
                         <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
                           <button 
@@ -919,14 +998,16 @@ const ProductionEnhancedApp = () => {
                             ✏️ Edit Room
                           </button>
                           
-                          {room.status === 'vacant' ? (
-                            <button 
-                              onClick={() => openModal('tenant', room)}
-                              style={{...successButtonStyle, fontSize: '12px', padding: '6px 12px'}}
-                            >
-                              👤 Add Tenant
-                            </button>
-                          ) : (
+                          {(() => {
+                            const tenantInfo = getRoomTenantInfo(room);
+                            return !tenantInfo.isOccupied ? (
+                              <button 
+                                onClick={() => openModal('tenant', room)}
+                                style={{...successButtonStyle, fontSize: '12px', padding: '6px 12px'}}
+                              >
+                                👤 Add Tenant
+                              </button>
+                            ) : (
                             <>
                               <button 
                                 onClick={() => openModal('tenant', room)}
@@ -953,7 +1034,8 @@ const ProductionEnhancedApp = () => {
                                 🚪 Remove Tenant
                               </button>
                             </>
-                          )}
+                            );
+                          })()}
                           
                           <button 
                             onClick={() => handleDelete('room', room)}
@@ -1342,11 +1424,6 @@ const ProductionEnhancedApp = () => {
           </div>
         </div>
       )}
-
-      {/* Temporary database setup for tenant table system */}
-      <div style={{position: 'fixed', top: '10px', right: '10px', zIndex: 1000}}>
-        <DatabaseSetup />
-      </div>
 
     </div>
   );
