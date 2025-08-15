@@ -433,6 +433,63 @@ const DatabaseSetup = () => {
     }
   };
 
+  const checkAndCreatePaymentsTable = async () => {
+    try {
+      addLog('🔍 Checking payments table...', 'info');
+      
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        addLog('❌ Payments table missing, creating it...', 'warning');
+        
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS payments (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            tenant_lease_id UUID NOT NULL REFERENCES tenant_leases(id) ON DELETE CASCADE,
+            payment_month VARCHAR(7) NOT NULL, -- YYYY-MM format
+            invoice_amount DECIMAL(10,2) NOT NULL,
+            paid_amount DECIMAL(10,2) DEFAULT 0,
+            payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'partial', 'paid', 'overdue')),
+            payment_date DATE,
+            payment_method VARCHAR(50), -- cash, bank_transfer, check, etc.
+            payment_reference VARCHAR(100), -- transaction ID, check number, etc.
+            notes TEXT,
+            due_date DATE NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            UNIQUE(tenant_lease_id, payment_month)
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_payments_lease ON payments(tenant_lease_id);
+          CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(payment_status);
+          CREATE INDEX IF NOT EXISTS idx_payments_month ON payments(payment_month);
+          CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date);
+          
+          CREATE TRIGGER update_payments_updated_at 
+          BEFORE UPDATE ON payments 
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        `;
+        
+        const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+        
+        if (createError) {
+          addLog(`❌ Failed to create payments table: ${createError.message}`, 'error');
+        } else {
+          addLog('✅ Payments table created successfully!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ Payments table already exists!', 'success');
+      } else {
+        addLog(`❌ Payments table check failed: ${error?.message}`, 'error');
+      }
+    } catch (error) {
+      addLog(`❌ Payments table error: ${error.message}`, 'error');
+    }
+  };
+
   const manualSchemaUpdate = () => {
     addLog('📋 Manual Schema Update Instructions:', 'info');
     addLog('1. Go to your Supabase Dashboard', 'info');
@@ -450,7 +507,9 @@ const DatabaseSetup = () => {
     addLog('CREATE TABLE tenant_leases (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, room_id UUID REFERENCES rooms(id) ON DELETE CASCADE, lease_start_date DATE NOT NULL, lease_end_date DATE, monthly_rent DECIMAL(10,2) NOT NULL, security_deposit DECIMAL(10,2) DEFAULT 0, lease_status VARCHAR(20) DEFAULT \'active\', notes TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE(room_id, lease_status) WHERE lease_status = \'active\');', 'info');
     addLog('-- Update rooms table', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS current_tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE SET NULL;', 'info');
-    addLog('6. Run this SQL for revenue history table:', 'info');
+    addLog('6. Run this SQL for payment tracking table:', 'info');
+    addLog('CREATE TABLE payments (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE CASCADE, payment_month VARCHAR(7) NOT NULL, invoice_amount DECIMAL(10,2) NOT NULL, paid_amount DECIMAL(10,2) DEFAULT 0, payment_status VARCHAR(20) DEFAULT \'pending\', payment_date DATE, payment_method VARCHAR(50), payment_reference VARCHAR(100), notes TEXT, due_date DATE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE(tenant_lease_id, payment_month));', 'info');
+    addLog('7. Run this SQL for revenue history table:', 'info');
     addLog(`CREATE TABLE IF NOT EXISTS revenue_history (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       month_key VARCHAR(7) NOT NULL UNIQUE,
@@ -510,6 +569,9 @@ const DatabaseSetup = () => {
       await checkAndCreateTenantsTable();
       await checkAndCreateTenantLeasesTable();
       await checkAndUpdateRoomsTable();
+
+      // Check and create payment tracking table
+      await checkAndCreatePaymentsTable();
 
       addLog('✅ Database setup completed!', 'success');
       setSetupStatus('completed');

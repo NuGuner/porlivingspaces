@@ -1,12 +1,14 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [tenantLeases, setTenantLeases] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -217,6 +219,18 @@ const ProductionEnhancedApp = () => {
         setError(`Leases: ${leasesError.message}`);
       } else {
         setTenantLeases(leasesData || []);
+      }
+
+      // Fetch payments data
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .order('payment_month', { ascending: false });
+        
+      if (paymentsError) {
+        setError(`Payments: ${paymentsError.message}`);
+      } else {
+        setPayments(paymentsData || []);
       }
       
       setLoading(false);
@@ -451,6 +465,100 @@ const ProductionEnhancedApp = () => {
       lease: null, 
       isOccupied: false
     };
+  };
+
+  // Get payment status for a lease and month
+  const getPaymentStatus = (leaseId, month = null) => {
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+    const payment = payments.find(p => 
+      p.tenant_lease_id === leaseId && p.payment_month === targetMonth
+    );
+    
+    if (!payment) {
+      return {
+        status: 'pending',
+        amount_due: 0,
+        paid_amount: 0,
+        outstanding: 0,
+        due_date: null,
+        is_overdue: false
+      };
+    }
+    
+    const outstanding = payment.invoice_amount - payment.paid_amount;
+    const is_overdue = new Date() > new Date(payment.due_date) && outstanding > 0;
+    
+    let status = payment.payment_status;
+    if (is_overdue && status !== 'paid') {
+      status = 'overdue';
+    }
+    
+    return {
+      status,
+      amount_due: payment.invoice_amount,
+      paid_amount: payment.paid_amount,
+      outstanding,
+      due_date: payment.due_date,
+      is_overdue,
+      payment_date: payment.payment_date,
+      payment_method: payment.payment_method,
+      payment_reference: payment.payment_reference
+    };
+  };
+
+  // Get outstanding balance for a lease (all unpaid months)
+  const getOutstandingBalance = (leaseId) => {
+    const leasePayments = payments.filter(p => p.tenant_lease_id === leaseId);
+    let total_outstanding = 0;
+    let overdue_months = 0;
+    
+    leasePayments.forEach(payment => {
+      const outstanding = payment.invoice_amount - payment.paid_amount;
+      if (outstanding > 0) {
+        total_outstanding += outstanding;
+        if (new Date() > new Date(payment.due_date)) {
+          overdue_months++;
+        }
+      }
+    });
+    
+    return {
+      total_outstanding,
+      overdue_months,
+      has_outstanding: total_outstanding > 0
+    };
+  };
+
+  // Create or update payment record
+  const recordPayment = async (leaseId, bill, paymentAmount, paymentMethod = 'cash', paymentReference = '') => {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const dueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      const paymentData = {
+        tenant_lease_id: leaseId,
+        payment_month: currentMonth,
+        invoice_amount: bill.total_amount,
+        paid_amount: paymentAmount,
+        payment_status: paymentAmount >= bill.total_amount ? 'paid' : (paymentAmount > 0 ? 'partial' : 'pending'),
+        payment_date: paymentAmount > 0 ? new Date().toISOString().split('T')[0] : null,
+        payment_method: paymentAmount > 0 ? paymentMethod : null,
+        payment_reference: paymentReference,
+        due_date: dueDate
+      };
+      
+      const { error } = await supabase
+        .from('payments')
+        .upsert(paymentData, { onConflict: 'tenant_lease_id,payment_month' });
+      
+      if (error) throw error;
+      
+      await fetchData(); // Refresh all data
+      return true;
+    } catch (error) {
+      setError(`Payment recording failed: ${error.message}`);
+      return false;
+    }
   };
 
   // Calculate tiered utility costs
@@ -1141,7 +1249,12 @@ const ProductionEnhancedApp = () => {
                           </p>
                           {(() => {
                             const tenantInfo = getRoomTenantInfo(room);
-                            return tenantInfo.isOccupied && (
+                            if (!tenantInfo.isOccupied) return null;
+                            
+                            const paymentStatus = getPaymentStatus(tenantInfo.lease.id);
+                            const outstandingBalance = getOutstandingBalance(tenantInfo.lease.id);
+                            
+                            return (
                               <>
                                 <p style={{margin: '2px 0', fontSize: '14px'}}>
                                   <strong>Tenant:</strong> {tenantInfo.tenant.full_name} ({tenantInfo.tenant.tenant_id_number})
@@ -1162,6 +1275,35 @@ const ProductionEnhancedApp = () => {
                                 {tenantInfo.lease.security_deposit > 0 && (
                                   <p style={{margin: '2px 0', fontSize: '14px'}}>
                                     <strong>💰 Deposit:</strong> ฿{tenantInfo.lease.security_deposit.toLocaleString()}
+                                  </p>
+                                )}
+                                
+                                {/* Payment Status Indicator */}
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '6px 10px',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: 
+                                    paymentStatus.status === 'paid' ? '#dcfce7' :
+                                    paymentStatus.status === 'partial' ? '#fef3c7' :
+                                    paymentStatus.status === 'overdue' ? '#fee2e2' : '#f3f4f6',
+                                  color:
+                                    paymentStatus.status === 'paid' ? '#166534' :
+                                    paymentStatus.status === 'partial' ? '#92400e' :
+                                    paymentStatus.status === 'overdue' ? '#dc2626' : '#6b7280'
+                                }}>
+                                  {paymentStatus.status === 'paid' ? '✅ Paid' :
+                                   paymentStatus.status === 'partial' ? '🟡 Partial' :
+                                   paymentStatus.status === 'overdue' ? '🔴 Overdue' : '⏳ Pending'}
+                                  {paymentStatus.outstanding > 0 && ` - ฿${paymentStatus.outstanding.toLocaleString()}`}
+                                </div>
+                                
+                                {outstandingBalance.has_outstanding && (
+                                  <p style={{margin: '4px 0 0 0', fontSize: '12px', color: '#dc2626', fontWeight: 'bold'}}>
+                                    💳 Total Outstanding: ฿{outstandingBalance.total_outstanding.toLocaleString()}
+                                    {outstandingBalance.overdue_months > 0 && ` (${outstandingBalance.overdue_months} overdue)`}
                                   </p>
                                 )}
                               </>
@@ -1232,6 +1374,12 @@ const ProductionEnhancedApp = () => {
                                 style={{...successButtonStyle, fontSize: '12px', padding: '6px 12px'}}
                               >
                                 💰 View Bill
+                              </button>
+                              <button 
+                                onClick={() => openModal('payment', room)}
+                                style={{...buttonStyle, fontSize: '12px', padding: '6px 12px'}}
+                              >
+                                💳 Record Payment
                               </button>
                               <button 
                                 onClick={() => handleDelete('tenant', room)}
@@ -1636,6 +1784,11 @@ const ProductionEnhancedApp = () => {
           </div>
         </div>
       )}
+
+      {/* Temporary database setup for payment tracking */}
+      <div style={{position: 'fixed', top: '10px', right: '10px', zIndex: 1000}}>
+        <DatabaseSetup />
+      </div>
 
     </div>
   );
