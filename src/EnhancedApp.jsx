@@ -14,9 +14,16 @@ const EnhancedApp = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
 
-  // Constants for bill calculation
-  const WATER_RATE_PER_UNIT = 15; // ฿15 per unit
-  const ELECTRIC_RATE_PER_UNIT = 8; // ฿8 per unit
+  // Configurable rates for bill calculation (stored in localStorage)
+  const [waterRate, setWaterRate] = useState(() => {
+    const saved = localStorage.getItem('waterRate');
+    return saved ? parseFloat(saved) : 15; // Default ฿15 per unit
+  });
+  
+  const [electricRate, setElectricRate] = useState(() => {
+    const saved = localStorage.getItem('electricRate');
+    return saved ? parseFloat(saved) : 8; // Default ฿8 per unit
+  });
 
   useEffect(() => {
     fetchData();
@@ -68,8 +75,8 @@ const EnhancedApp = () => {
     
     const waterUnits = Math.max(0, (room.water_meter || 0) - previousWater);
     const electricUnits = Math.max(0, (room.electric_meter || 0) - previousElectric);
-    const waterCost = waterUnits * WATER_RATE_PER_UNIT;
-    const electricCost = electricUnits * ELECTRIC_RATE_PER_UNIT;
+    const waterCost = waterUnits * waterRate;
+    const electricCost = electricUnits * electricRate;
     const totalAmount = (room.rent_price || 0) + waterCost + electricCost;
 
     return {
@@ -137,6 +144,11 @@ const EnhancedApp = () => {
         water_meter: item.water_meter || 0,
         previous_electric_meter: item.electric_meter || 0,
         electric_meter: item.electric_meter || 0
+      });
+    } else if (type === 'settings') {
+      setFormData({
+        water_rate: waterRate,
+        electric_rate: electricRate
       });
     }
   };
@@ -290,6 +302,18 @@ const EnhancedApp = () => {
           if (error) throw error;
           console.log('⚠️ Fallback meter update (schema error)');
         }
+      } else if (modalType === 'settings') {
+        // Save rates to localStorage
+        const newWaterRate = parseFloat(formData.water_rate) || 15;
+        const newElectricRate = parseFloat(formData.electric_rate) || 8;
+        
+        localStorage.setItem('waterRate', newWaterRate.toString());
+        localStorage.setItem('electricRate', newElectricRate.toString());
+        
+        setWaterRate(newWaterRate);
+        setElectricRate(newElectricRate);
+        
+        console.log('⚙️ Settings updated:', { waterRate: newWaterRate, electricRate: newElectricRate });
       }
 
       console.log('✅ Save successful, refreshing data...');
@@ -457,12 +481,32 @@ const EnhancedApp = () => {
       
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={{margin: 0, fontSize: '28px'}}>
-          🏢 PorLivingSpaces
-        </h1>
-        <p style={{margin: '10px 0 0 0', opacity: 0.9}}>
-          Professional Rental Management with Bill Calculation
-        </p>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <div>
+            <h1 style={{margin: 0, fontSize: '28px'}}>
+              🏢 PorLivingSpaces
+            </h1>
+            <p style={{margin: '10px 0 0 0', opacity: 0.9}}>
+              Professional Rental Management with Bill Calculation
+            </p>
+          </div>
+          <div style={{textAlign: 'right'}}>
+            <button
+              onClick={() => openModal('settings')}
+              style={{
+                ...primaryButtonStyle,
+                fontSize: '14px',
+                padding: '8px 16px',
+                marginBottom: '8px'
+              }}
+            >
+              ⚙️ Settings
+            </button>
+            <div style={{fontSize: '12px', color: '#64748b'}}>
+              💧 Water: ฿{waterRate}/unit | ⚡ Electric: ฿{electricRate}/unit
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Database Setup Component - Temporarily visible to fix schema */}
@@ -651,8 +695,8 @@ const EnhancedApp = () => {
                             <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#059669'}}>💰 Monthly Bill</h4>
                             <div style={{fontSize: '12px'}}>
                               <p style={{margin: '2px 0'}}>Rent: ฿{bill.rent_amount.toLocaleString()}</p>
-                              <p style={{margin: '2px 0'}}>Water: {bill.water_units} units × ฿{WATER_RATE_PER_UNIT} = ฿{bill.water_cost.toLocaleString()}</p>
-                              <p style={{margin: '2px 0'}}>Electric: {bill.electric_units} units × ฿{ELECTRIC_RATE_PER_UNIT} = ฿{bill.electric_cost.toLocaleString()}</p>
+                              <p style={{margin: '2px 0'}}>Water: {bill.water_units} units × ฿{waterRate} = ฿{bill.water_cost.toLocaleString()}</p>
+                              <p style={{margin: '2px 0'}}>Electric: {bill.electric_units} units × ฿{electricRate} = ฿{bill.electric_cost.toLocaleString()}</p>
                               <p style={{margin: '5px 0 0 0', fontWeight: 'bold', fontSize: '14px'}}>Total: ฿{bill.total_amount.toLocaleString()}</p>
                             </div>
                           </div>
@@ -729,6 +773,7 @@ const EnhancedApp = () => {
               {modalType === 'tenant' && (editingItem ? 'Edit Tenant' : 'Add Tenant')}
               {modalType === 'meter-update' && 'Update Meter Readings'}
               {modalType === 'bill' && 'Monthly Bill Details'}
+              {modalType === 'settings' && 'Rate Settings'}
             </h2>
             
             {modalType === 'building' && (
@@ -938,6 +983,62 @@ const EnhancedApp = () => {
               </div>
             )}
 
+            {modalType === 'settings' && (
+              <div>
+                <div style={{backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '6px', marginBottom: '20px'}}>
+                  <h4 style={{margin: '0 0 10px 0', color: '#059669'}}>⚙️ Utility Rate Configuration</h4>
+                  <p style={{margin: 0, fontSize: '14px', color: '#6b7280'}}>
+                    Set the cost per unit for water and electricity billing calculations.
+                  </p>
+                </div>
+
+                <div style={{marginBottom: '20px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#0ea5e9'}}>
+                    💧 Water Rate (฿ per unit):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.water_rate || ''}
+                    onChange={(e) => setFormData({...formData, water_rate: parseFloat(e.target.value) || 0})}
+                    style={inputStyle}
+                    placeholder="Enter water rate per unit"
+                  />
+                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px'}}>
+                    Current rate: ฿{waterRate} per unit
+                  </div>
+                </div>
+
+                <div style={{marginBottom: '20px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#f59e0b'}}>
+                    ⚡ Electric Rate (฿ per unit):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.electric_rate || ''}
+                    onChange={(e) => setFormData({...formData, electric_rate: parseFloat(e.target.value) || 0})}
+                    style={inputStyle}
+                    placeholder="Enter electric rate per unit"
+                  />
+                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px'}}>
+                    Current rate: ฿{electricRate} per unit
+                  </div>
+                </div>
+
+                                  <div style={{backgroundColor: '#dbeafe', padding: '12px', borderRadius: '6px', marginBottom: '20px'}}>
+                    <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#1e40af'}}>💡 Rate Impact Preview</h4>
+                    <div style={{fontSize: '12px', color: '#1e40af'}}>
+                      <p style={{margin: '2px 0'}}>• Water: 10 units × ฿{formData.water_rate || waterRate} = ฿{(10 * (formData.water_rate || waterRate)).toFixed(2)}</p>
+                      <p style={{margin: '2px 0'}}>• Electric: 50 units × ฿{formData.electric_rate || electricRate} = ฿{(50 * (formData.electric_rate || electricRate)).toFixed(2)}</p>
+                      <p style={{margin: '2px 0', fontWeight: 'bold'}}>• Example monthly utilities: ฿{(10 * (formData.water_rate || waterRate) + 50 * (formData.electric_rate || electricRate)).toFixed(2)}</p>
+                    </div>
+                  </div>
+              </div>
+            )}
+
             {modalType === 'bill' && formData.total_amount !== undefined && (
               <div>
                 <div style={{backgroundColor: '#f0f9ff', padding: '20px', borderRadius: '8px', marginBottom: '20px'}}>
@@ -961,7 +1062,7 @@ const EnhancedApp = () => {
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Previous Reading: {editingItem?.previous_water_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Current Reading: {editingItem?.water_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Usage: {formData.water_units} units</p>
-                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.water_units} × ฿{WATER_RATE_PER_UNIT} = ฿{formData.water_cost?.toLocaleString()}</p>
+                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.water_units} × ฿{waterRate} = ฿{formData.water_cost?.toLocaleString()}</p>
                   </div>
 
                   <div style={{marginBottom: '15px'}}>
@@ -969,7 +1070,7 @@ const EnhancedApp = () => {
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Previous Reading: {editingItem?.previous_electric_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Current Reading: {editingItem?.electric_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Usage: {formData.electric_units} units</p>
-                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.electric_units} × ฿{ELECTRIC_RATE_PER_UNIT} = ฿{formData.electric_cost?.toLocaleString()}</p>
+                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.electric_units} × ฿{electricRate} = ฿{formData.electric_cost?.toLocaleString()}</p>
                   </div>
 
                   <div style={{borderTop: '2px solid #2563eb', paddingTop: '15px'}}>
@@ -991,7 +1092,7 @@ const EnhancedApp = () => {
                   Cancel
                 </button>
                 <button onClick={handleSave} style={buttonStyle}>
-                  {editingItem ? 'Update' : 'Create'}
+                  {modalType === 'settings' ? 'Save Settings' : (editingItem ? 'Update' : 'Create')}
                 </button>
               </div>
             )}
