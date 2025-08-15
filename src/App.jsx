@@ -16,6 +16,8 @@ import LoadingSpinner from './components/LoadingSpinner';
 import DataDebugger from './components/DataDebugger';
 import EmptyState from './components/EmptyState';
 import WelcomeGuide from './components/WelcomeGuide';
+import ConnectionTest from './components/ConnectionTest';
+import DatabaseSetup from './components/DatabaseSetup';
 
 // Constants for bill calculation
 const WATER_RATE_PER_UNIT = 15;
@@ -270,6 +272,12 @@ const App = () => {
             </p>
           </div>
 
+          {/* Connection Test - diagnose the actual issue */}
+          <ConnectionTest />
+          
+          {/* Database Setup - check and create tables if needed */}
+          <DatabaseSetup />
+          
           {/* Debug Component - shows connection status and data */}
           <DataDebugger />
 
