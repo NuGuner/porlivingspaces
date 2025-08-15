@@ -272,9 +272,11 @@ const DatabaseSetup = () => {
             termination_reason TEXT,
             notes TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-            UNIQUE(room_id, lease_status) WHERE lease_status = 'active'
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
           );
+          
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_leases_one_active_per_room 
+          ON tenant_leases(room_id) WHERE lease_status = 'active';
           
           CREATE INDEX IF NOT EXISTS idx_tenant_leases_tenant ON tenant_leases(tenant_id);
           CREATE INDEX IF NOT EXISTS idx_tenant_leases_room ON tenant_leases(room_id);
@@ -459,9 +461,11 @@ const DatabaseSetup = () => {
             notes TEXT,
             due_date DATE NOT NULL,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-            UNIQUE(tenant_lease_id, payment_month)
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
           );
+          
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_lease_month 
+          ON payments(tenant_lease_id, payment_month);
           
           CREATE INDEX IF NOT EXISTS idx_payments_lease ON payments(tenant_lease_id);
           CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(payment_status);
@@ -504,11 +508,13 @@ const DatabaseSetup = () => {
     addLog('-- Create tenants table', 'info');
     addLog('CREATE TABLE tenants (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id_number VARCHAR(50) UNIQUE NOT NULL, full_name VARCHAR(255) NOT NULL, phone VARCHAR(50), email VARCHAR(255), address TEXT, id_card_number VARCHAR(50), emergency_contact_name VARCHAR(255), emergency_contact_phone VARCHAR(50), notes TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());', 'info');
     addLog('-- Create tenant_leases table', 'info');
-    addLog('CREATE TABLE tenant_leases (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, room_id UUID REFERENCES rooms(id) ON DELETE CASCADE, lease_start_date DATE NOT NULL, lease_end_date DATE, monthly_rent DECIMAL(10,2) NOT NULL, security_deposit DECIMAL(10,2) DEFAULT 0, lease_status VARCHAR(20) DEFAULT \'active\', notes TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE(room_id, lease_status) WHERE lease_status = \'active\');', 'info');
+    addLog('CREATE TABLE tenant_leases (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, room_id UUID REFERENCES rooms(id) ON DELETE CASCADE, lease_start_date DATE NOT NULL, lease_end_date DATE, monthly_rent DECIMAL(10,2) NOT NULL, security_deposit DECIMAL(10,2) DEFAULT 0, lease_status VARCHAR(20) DEFAULT \'active\', notes TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());', 'info');
+    addLog('CREATE UNIQUE INDEX idx_tenant_leases_one_active_per_room ON tenant_leases(room_id) WHERE lease_status = \'active\';', 'info');
     addLog('-- Update rooms table', 'info');
     addLog('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS current_tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE SET NULL;', 'info');
     addLog('6. Run this SQL for payment tracking table:', 'info');
-    addLog('CREATE TABLE payments (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE CASCADE, payment_month VARCHAR(7) NOT NULL, invoice_amount DECIMAL(10,2) NOT NULL, paid_amount DECIMAL(10,2) DEFAULT 0, payment_status VARCHAR(20) DEFAULT \'pending\', payment_date DATE, payment_method VARCHAR(50), payment_reference VARCHAR(100), notes TEXT, due_date DATE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE(tenant_lease_id, payment_month));', 'info');
+    addLog('CREATE TABLE payments (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, tenant_lease_id UUID REFERENCES tenant_leases(id) ON DELETE CASCADE, payment_month VARCHAR(7) NOT NULL, invoice_amount DECIMAL(10,2) NOT NULL, paid_amount DECIMAL(10,2) DEFAULT 0, payment_status VARCHAR(20) DEFAULT \'pending\', payment_date DATE, payment_method VARCHAR(50), payment_reference VARCHAR(100), notes TEXT, due_date DATE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());', 'info');
+    addLog('CREATE UNIQUE INDEX idx_payments_lease_month ON payments(tenant_lease_id, payment_month);', 'info');
     addLog('7. Run this SQL for revenue history table:', 'info');
     addLog(`CREATE TABLE IF NOT EXISTS revenue_history (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
