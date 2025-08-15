@@ -23,7 +23,7 @@ const DataDebugger = () => {
       
       try {
         // Test connection
-        const { data: testData, error: testError } = await supabase
+        const { error: testError } = await supabase
           .from('buildings')
           .select('count', { count: 'exact' });
         

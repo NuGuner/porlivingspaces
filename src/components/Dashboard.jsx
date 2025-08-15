@@ -44,71 +44,70 @@ const Dashboard = ({ rooms }) => {
   const stats = dashboardStats();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12 animate-fade-in">
-      <div className="glass p-8 rounded-3xl shadow-lg card-hover group">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-cyan-500 rounded-2xl flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform duration-300">
-            🏠
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+      <div className="card p-6 card-hover">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+            <span className="text-success text-lg">🏠</span>
           </div>
-          <h2 className="text-lg font-medium text-gray-600">ห้องว่าง</h2>
+          <span className="text-2xl font-bold text-success">{stats.vacantRooms}</span>
         </div>
-        <p className="text-4xl font-bold bg-gradient-to-r from-emerald-500 to-cyan-600 bg-clip-text text-transparent">
-          {stats.vacantRooms}
-        </p>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">ห้องว่าง</h3>
+        <p className="text-xs text-gray-500">พร้อมให้เช่า</p>
       </div>
       
-      <div className="glass p-8 rounded-3xl shadow-lg card-hover group">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform duration-300">
-            👥
+      <div className="card p-6 card-hover">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+            <span className="text-primary text-lg">👥</span>
           </div>
-          <h2 className="text-lg font-medium text-gray-600">ห้องมีผู้เช่า</h2>
+          <span className="text-2xl font-bold text-primary">{stats.occupiedRooms}</span>
         </div>
-        <p className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
-          {stats.occupiedRooms}
-        </p>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">ห้องมีผู้เช่า</h3>
+        <p className="text-xs text-gray-500">กำลังดำเนินการ</p>
       </div>
       
-      <div className="glass p-8 rounded-3xl shadow-lg card-hover group">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-red-400 to-pink-500 rounded-2xl flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform duration-300">
-            ⚠️
+      <div className="card p-6 card-hover">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center">
+            <span className="text-error text-lg">⚠️</span>
           </div>
-          <h2 className="text-lg font-medium text-gray-600">ห้องค้างค่าเช่า</h2>
+          <span className="text-2xl font-bold text-error">{stats.overdueRooms}</span>
         </div>
-        <p className="text-4xl font-bold bg-gradient-to-r from-red-500 to-pink-600 bg-clip-text text-transparent">
-          {stats.overdueRooms}
-        </p>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">ห้องค้างค่าเช่า</h3>
+        <p className="text-xs text-gray-500">ต้องติดตาม</p>
       </div>
       
-      <div className="glass p-8 rounded-3xl shadow-lg card-hover group">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform duration-300">
-            💰
+      <div className="card p-6 card-hover">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+            <span className="text-success text-lg">💰</span>
           </div>
-          <h2 className="text-lg font-medium text-gray-600">รายรับเดือนนี้</h2>
+          <div className="text-right">
+            <div className="text-xl font-bold text-success">
+              {stats.currentMonthIncome.toLocaleString('th-TH')}
+            </div>
+            <div className="text-xs text-gray-500">บาท</div>
+          </div>
         </div>
-        <div className="flex flex-col">
-          <p className="text-3xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
-            {stats.currentMonthIncome.toLocaleString('th-TH')}
-          </p>
-          <span className="text-sm text-gray-500 font-medium">บาท</span>
-        </div>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">รายรับเดือนนี้</h3>
+        <p className="text-xs text-gray-500">ยอดเก็บได้</p>
       </div>
       
-      <div className="glass p-8 rounded-3xl shadow-lg card-hover group">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform duration-300">
-            📋
+      <div className="card p-6 card-hover">
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
+            <span className="text-warning text-lg">📋</span>
           </div>
-          <h2 className="text-lg font-medium text-gray-600">ค่าเช่าค้างจ่าย</h2>
+          <div className="text-right">
+            <div className="text-xl font-bold text-warning">
+              {stats.outstandingRent.toLocaleString('th-TH')}
+            </div>
+            <div className="text-xs text-gray-500">บาท</div>
+          </div>
         </div>
-        <div className="flex flex-col">
-          <p className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
-            {stats.outstandingRent.toLocaleString('th-TH')}
-          </p>
-          <span className="text-sm text-gray-500 font-medium">บาท</span>
-        </div>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">ค่าเช่าค้างจ่าย</h3>
+        <p className="text-xs text-gray-500">รอการชำระ</p>
       </div>
     </div>
   );

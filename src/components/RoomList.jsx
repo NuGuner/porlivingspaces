@@ -196,24 +196,24 @@ const RoomList = ({ rooms, waterRate, electricRate }) => {
         error={error} 
         onClose={() => setError('')}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {rooms.map(room => (
-          <div key={room.id} className="glass p-8 rounded-3xl shadow-lg card-hover group animate-scale-in">
-            <div className="flex justify-between items-center mb-6">
+          <div key={room.id} className="card p-6 card-hover">
+            <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg">
-                  {room.room_number.slice(-2)}
+                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <span className="text-primary font-bold text-sm">{room.room_number.slice(-2)}</span>
                 </div>
-                <h3 className="text-xl font-bold gradient-text">{room.room_number}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{room.room_number}</h3>
               </div>
               <span
-                className={`px-4 py-2 rounded-2xl text-sm font-medium ${
+                className={`px-3 py-1 rounded-lg text-xs font-medium ${
                   room.status === 'occupied' 
-                    ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200' 
-                    : 'bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 border border-emerald-200'
+                    ? 'bg-primary/10 text-primary' 
+                    : 'bg-success/10 text-success'
                 }`}
               >
-                {room.status === 'occupied' ? '👤 มีผู้เช่า' : '🏠 ห้องว่าง'}
+                {room.status === 'occupied' ? 'มีผู้เช่า' : 'ห้องว่าง'}
               </span>
             </div>
             {room.status === 'occupied' ? (
