@@ -494,6 +494,58 @@ const DatabaseSetup = () => {
     }
   };
 
+  const checkAndCreateUserProfilesTable = async () => {
+    try {
+      addLog('🔍 Checking user_profiles table...', 'info');
+      
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        addLog('❌ User profiles table missing, creating it...', 'warning');
+        
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS user_profiles (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            full_name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            role VARCHAR(20) DEFAULT 'admin' CHECK (role IN ('admin', 'manager', 'staff')),
+            phone VARCHAR(50),
+            profile_picture_url TEXT,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_role ON user_profiles(role);
+          CREATE INDEX IF NOT EXISTS idx_user_profiles_active ON user_profiles(is_active);
+          
+          CREATE TRIGGER update_user_profiles_updated_at 
+          BEFORE UPDATE ON user_profiles 
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        `;
+        
+        const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+        
+        if (createError) {
+          addLog(`❌ Failed to create user_profiles table: ${createError.message}`, 'error');
+        } else {
+          addLog('✅ User profiles table created successfully!', 'success');
+        }
+      } else if (data !== null) {
+        addLog('✅ User profiles table already exists!', 'success');
+      } else {
+        addLog(`❌ User profiles table check failed: ${error?.message}`, 'error');
+      }
+    } catch (error) {
+      addLog(`❌ User profiles table error: ${error.message}`, 'error');
+    }
+  };
+
   const manualSchemaUpdate = () => {
     addLog('📋 Manual Schema Update Instructions:', 'info');
     addLog('1. Go to your Supabase Dashboard', 'info');
@@ -578,6 +630,9 @@ const DatabaseSetup = () => {
 
       // Check and create payment tracking table
       await checkAndCreatePaymentsTable();
+
+      // Check and create user profiles table for authentication
+      await checkAndCreateUserProfilesTable();
 
       addLog('✅ Database setup completed!', 'success');
       setSetupStatus('completed');

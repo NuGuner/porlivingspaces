@@ -1,8 +1,11 @@
 // Production-optimized Enhanced App without console logging
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import { useAuth } from './contexts/AuthContext';
+import DatabaseSetup from './components/DatabaseSetup';
 
 const ProductionEnhancedApp = () => {
+  const { user, userProfile, signOut } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -1068,8 +1071,88 @@ const ProductionEnhancedApp = () => {
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
-      <div style={headerStyle}>
+      {/* Authentication Header */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e5e7eb',
+        zIndex: 1000,
+        padding: '12px 24px'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          maxWidth: '1400px',
+          margin: '0 auto'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#1f2937',
+              margin: 0
+            }}>
+              🏢 PorLivingSpaces
+            </h1>
+            <span style={{
+              fontSize: '12px',
+              color: '#6b7280',
+              background: '#f3f4f6',
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              Professional Edition
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
+                👤 {userProfile?.full_name || user?.email || 'User'}
+              </div>
+              <div style={{
+                fontSize: '12px',
+                color: '#6b7280'
+              }}>
+                {userProfile?.role || 'Admin'} • {user?.email}
+              </div>
+            </div>
+            
+            <button
+              onClick={signOut}
+              style={{
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+            >
+              🚪 Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content with padding for header */}
+      <div style={{ paddingTop: '80px' }}>
+        <div style={containerStyle}>
+          {/* Header */}
+          <div style={headerStyle}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
           <div>
             <h1 style={{margin: 0, fontSize: '28px'}}>
@@ -1908,6 +1991,8 @@ const ProductionEnhancedApp = () => {
         </div>
       )}
 
+        </div>
+      </div>
     </div>
   );
 };
