@@ -1,12 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.jsx'
-import MinimalApp from './MinimalApp.jsx'
+import WorkingApp from './WorkingApp.jsx'
 
-// Switch to MinimalApp to test basic functionality
+// Switch to WorkingApp - the fully functional version
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <MinimalApp />
+    <WorkingApp />
   </StrictMode>,
 )
