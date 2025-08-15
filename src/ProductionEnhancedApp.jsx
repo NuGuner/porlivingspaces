@@ -13,16 +13,22 @@ const ProductionEnhancedApp = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
 
-  // Configurable rates for bill calculation (stored in localStorage)
+  // Tiered pricing configuration (stored in localStorage)
   const [waterRate, setWaterRate] = useState(() => {
     const saved = localStorage.getItem('waterRate');
-    return saved ? parseFloat(saved) : 15;
+    return saved ? parseFloat(saved) : 25; // ฿25 per unit
   });
   
   const [electricRate, setElectricRate] = useState(() => {
     const saved = localStorage.getItem('electricRate');
-    return saved ? parseFloat(saved) : 8;
+    return saved ? parseFloat(saved) : 10; // ฿10 per unit
   });
+
+  // Minimum charge thresholds
+  const [waterMinCharge] = useState(100); // ฿100 minimum (covers 1-4 units)
+  const [electricMinCharge] = useState(100); // ฿100 minimum (covers 1-10 units)
+  const [waterMinUnits] = useState(4); // 1-4 units = ฿100
+  const [electricMinUnits] = useState(10); // 1-10 units = ฿100
 
   // Revenue history from database
   const [revenueHistory, setRevenueHistory] = useState({});
@@ -190,7 +196,14 @@ const ProductionEnhancedApp = () => {
     }
   };
 
-  // Calculate bill based on current and previous meter readings
+  // Calculate tiered utility costs
+  const calculateUtilityCost = (units, rate, minCharge, minUnits) => {
+    if (units === 0) return 0;
+    if (units <= minUnits) return minCharge;
+    return minCharge + ((units - minUnits) * rate);
+  };
+
+  // Calculate bill based on current and previous meter readings with tiered pricing
   const calculateBill = (room) => {
     if (!room.tenant_name || room.status !== 'occupied') return null;
 
@@ -199,16 +212,25 @@ const ProductionEnhancedApp = () => {
     
     const waterUnits = Math.max(0, (room.water_meter || 0) - previousWater);
     const electricUnits = Math.max(0, (room.electric_meter || 0) - previousElectric);
-    const waterCost = waterUnits * waterRate;
-    const electricCost = electricUnits * electricRate;
+    
+    // Calculate costs using tiered pricing
+    const waterCost = calculateUtilityCost(waterUnits, waterRate, waterMinCharge, waterMinUnits);
+    const electricCost = calculateUtilityCost(electricUnits, electricRate, electricMinCharge, electricMinUnits);
+    
     const totalAmount = (room.rent_price || 0) + waterCost + electricCost;
 
     return {
       rent_amount: room.rent_price || 0,
       water_units: waterUnits,
       water_cost: waterCost,
+      water_rate: waterRate,
+      water_min_charge: waterMinCharge,
+      water_min_units: waterMinUnits,
       electric_units: electricUnits,
       electric_cost: electricCost,
+      electric_rate: electricRate,
+      electric_min_charge: electricMinCharge,
+      electric_min_units: electricMinUnits,
       total_amount: totalAmount,
       month: new Date().toISOString().slice(0, 7),
       due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
@@ -647,7 +669,7 @@ const ProductionEnhancedApp = () => {
               ⚙️ Settings
             </button>
             <div style={{fontSize: '12px', color: '#64748b'}}>
-              💧 Water: ฿{waterRate}/unit | ⚡ Electric: ฿{electricRate}/unit
+              💧 Water: ฿{waterMinCharge} (1-{waterMinUnits}u), ฿{waterRate}/u after | ⚡ Electric: ฿{electricMinCharge} (1-{electricMinUnits}u), ฿{electricRate}/u after
             </div>
           </div>
         </div>
@@ -847,15 +869,27 @@ const ProductionEnhancedApp = () => {
                         </div>
 
                         {room.status === 'occupied' && bill && (
-                          <div style={{backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '6px', marginBottom: '15px'}}>
-                            <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#059669'}}>💰 Monthly Bill</h4>
-                            <div style={{fontSize: '12px'}}>
-                              <p style={{margin: '2px 0'}}>Rent: ฿{bill.rent_amount.toLocaleString()}</p>
-                              <p style={{margin: '2px 0'}}>Water: {bill.water_units} units × ฿{waterRate} = ฿{bill.water_cost.toLocaleString()}</p>
-                              <p style={{margin: '2px 0'}}>Electric: {bill.electric_units} units × ฿{electricRate} = ฿{bill.electric_cost.toLocaleString()}</p>
-                              <p style={{margin: '5px 0 0 0', fontWeight: 'bold', fontSize: '14px'}}>Total: ฿{bill.total_amount.toLocaleString()}</p>
-                            </div>
-                          </div>
+                                                     <div style={{backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '6px', marginBottom: '15px'}}>
+                             <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#059669'}}>💰 Monthly Bill</h4>
+                             <div style={{fontSize: '12px'}}>
+                               <p style={{margin: '2px 0'}}>Rent: ฿{bill.rent_amount.toLocaleString()}</p>
+                               <p style={{margin: '2px 0'}}>
+                                 Water: {bill.water_units} units = {
+                                   bill.water_units === 0 ? '฿0' :
+                                   bill.water_units <= waterMinUnits ? `฿${waterMinCharge} (min)` :
+                                   `฿${waterMinCharge} + ${bill.water_units - waterMinUnits} × ฿${waterRate} = ฿${bill.water_cost.toLocaleString()}`
+                                 }
+                               </p>
+                               <p style={{margin: '2px 0'}}>
+                                 Electric: {bill.electric_units} units = {
+                                   bill.electric_units === 0 ? '฿0' :
+                                   bill.electric_units <= electricMinUnits ? `฿${electricMinCharge} (min)` :
+                                   `฿${electricMinCharge} + ${bill.electric_units - electricMinUnits} × ฿${electricRate} = ฿${bill.electric_cost.toLocaleString()}`
+                                 }
+                               </p>
+                               <p style={{margin: '5px 0 0 0', fontWeight: 'bold', fontSize: '14px'}}>Total: ฿{bill.total_amount.toLocaleString()}</p>
+                             </div>
+                           </div>
                         )}
 
                         <div style={{display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
@@ -1131,15 +1165,15 @@ const ProductionEnhancedApp = () => {
             {modalType === 'settings' && (
               <div>
                 <div style={{backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '6px', marginBottom: '20px'}}>
-                  <h4 style={{margin: '0 0 10px 0', color: '#059669'}}>⚙️ Utility Rate Configuration</h4>
+                  <h4 style={{margin: '0 0 10px 0', color: '#059669'}}>⚙️ Tiered Utility Rate Configuration</h4>
                   <p style={{margin: 0, fontSize: '14px', color: '#6b7280'}}>
-                    Set the cost per unit for water and electricity billing calculations.
+                    Configure tiered pricing with minimum charges for water and electricity.
                   </p>
                 </div>
 
                 <div style={{marginBottom: '20px'}}>
                   <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#0ea5e9'}}>
-                    💧 Water Rate (฿ per unit):
+                    💧 Water Rate (฿ per unit above minimum):
                   </label>
                   <input
                     type="number"
@@ -1150,14 +1184,16 @@ const ProductionEnhancedApp = () => {
                     style={inputStyle}
                     placeholder="Enter water rate per unit"
                   />
-                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px'}}>
-                    Current rate: ฿{waterRate} per unit
+                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px', backgroundColor: '#f0f9ff', padding: '8px', borderRadius: '4px'}}>
+                    <strong>Current: ฿{waterRate}/unit</strong><br/>
+                    Minimum charge: ฿{waterMinCharge} (covers 1-{waterMinUnits} units)<br/>
+                    Above {waterMinUnits} units: ฿{waterRate} per additional unit
                   </div>
                 </div>
 
                 <div style={{marginBottom: '20px'}}>
                   <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#f59e0b'}}>
-                    ⚡ Electric Rate (฿ per unit):
+                    ⚡ Electric Rate (฿ per unit above minimum):
                   </label>
                   <input
                     type="number"
@@ -1168,17 +1204,20 @@ const ProductionEnhancedApp = () => {
                     style={inputStyle}
                     placeholder="Enter electric rate per unit"
                   />
-                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px'}}>
-                    Current rate: ฿{electricRate} per unit
+                  <div style={{fontSize: '12px', color: '#64748b', marginTop: '4px', backgroundColor: '#fff7ed', padding: '8px', borderRadius: '4px'}}>
+                    <strong>Current: ฿{electricRate}/unit</strong><br/>
+                    Minimum charge: ฿{electricMinCharge} (covers 1-{electricMinUnits} units)<br/>
+                    Above {electricMinUnits} units: ฿{electricRate} per additional unit
                   </div>
                 </div>
 
                 <div style={{backgroundColor: '#dbeafe', padding: '12px', borderRadius: '6px', marginBottom: '20px'}}>
-                  <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#1e40af'}}>💡 Rate Impact Preview</h4>
+                  <h4 style={{margin: '0 0 8px 0', fontSize: '14px', color: '#1e40af'}}>💡 Tiered Pricing Examples</h4>
                   <div style={{fontSize: '12px', color: '#1e40af'}}>
-                    <p style={{margin: '2px 0'}}>• Water: 10 units × ฿{formData.water_rate || waterRate} = ฿{(10 * (formData.water_rate || waterRate)).toFixed(2)}</p>
-                    <p style={{margin: '2px 0'}}>• Electric: 50 units × ฿{formData.electric_rate || electricRate} = ฿{(50 * (formData.electric_rate || electricRate)).toFixed(2)}</p>
-                    <p style={{margin: '2px 0', fontWeight: 'bold'}}>• Example monthly utilities: ฿{(10 * (formData.water_rate || waterRate) + 50 * (formData.electric_rate || electricRate)).toFixed(2)}</p>
+                    <p style={{margin: '2px 0'}}>• Water 2 units: ฿{waterMinCharge} (minimum)</p>
+                    <p style={{margin: '2px 0'}}>• Water 6 units: ฿{waterMinCharge} + 2 × ฿{formData.water_rate || waterRate} = ฿{(waterMinCharge + 2 * (formData.water_rate || waterRate)).toFixed(2)}</p>
+                    <p style={{margin: '2px 0'}}>• Electric 5 units: ฿{electricMinCharge} (minimum)</p>
+                    <p style={{margin: '2px 0'}}>• Electric 15 units: ฿{electricMinCharge} + 5 × ฿{formData.electric_rate || electricRate} = ฿{(electricMinCharge + 5 * (formData.electric_rate || electricRate)).toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -1207,7 +1246,13 @@ const ProductionEnhancedApp = () => {
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Previous Reading: {editingItem?.previous_water_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Current Reading: {editingItem?.water_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Usage: {formData.water_units} units</p>
-                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.water_units} × ฿{waterRate} = ฿{formData.water_cost?.toLocaleString()}</p>
+                    <p style={{margin: '2px 0', fontSize: '14px'}}>
+                      Cost: {
+                        formData.water_units === 0 ? '฿0 (no usage)' :
+                        formData.water_units <= waterMinUnits ? `฿${waterMinCharge} (minimum charge for 1-${waterMinUnits} units)` :
+                        `฿${waterMinCharge} (min) + ${formData.water_units - waterMinUnits} units × ฿${waterRate} = ฿${formData.water_cost?.toLocaleString()}`
+                      }
+                    </p>
                   </div>
 
                   <div style={{marginBottom: '15px'}}>
@@ -1215,7 +1260,13 @@ const ProductionEnhancedApp = () => {
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Previous Reading: {editingItem?.previous_electric_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Current Reading: {editingItem?.electric_meter || 0}</p>
                     <p style={{margin: '2px 0', fontSize: '14px'}}>Usage: {formData.electric_units} units</p>
-                    <p style={{margin: '2px 0', fontSize: '14px'}}>Cost: {formData.electric_units} × ฿{electricRate} = ฿{formData.electric_cost?.toLocaleString()}</p>
+                    <p style={{margin: '2px 0', fontSize: '14px'}}>
+                      Cost: {
+                        formData.electric_units === 0 ? '฿0 (no usage)' :
+                        formData.electric_units <= electricMinUnits ? `฿${electricMinCharge} (minimum charge for 1-${electricMinUnits} units)` :
+                        `฿${electricMinCharge} (min) + ${formData.electric_units - electricMinUnits} units × ฿${electricRate} = ฿${formData.electric_cost?.toLocaleString()}`
+                      }
+                    </p>
                   </div>
 
                   <div style={{borderTop: '2px solid #2563eb', paddingTop: '15px'}}>
